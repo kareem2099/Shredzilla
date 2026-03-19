@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="my_images" path="images/"/>
+    <!-- 
+        Using cache-path for temporary camera images. 
+        These might be cleared by the system if storage is low.
+        Alternatively, use files-path if you want them in the app's internal files dir,
+        but ensure you manage cleanup if the user cancels or the operation fails.
+        The ImageStorageUtils.createImageFile currently uses context.cacheDir.
+    -->
+</paths>

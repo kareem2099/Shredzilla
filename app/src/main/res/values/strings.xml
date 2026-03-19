@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Shredzilla</string>
+    <string name="title_activity_auth">Authentication</string>
+    <string name="default_web_client_id" translatable="false">501485535836-17jc1l62hkrotlokti5s2qv4smad00ub.apps.googleusercontent.com</string>
+    <string name="title_activity_onboarding">Select Gender</string>
+    <string name="default_notification_channel_id" translatable="false">shredzilla_fcm_channel</string>
+</resources>

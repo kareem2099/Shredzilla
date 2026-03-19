@@ -1,0 +1,34 @@
+# Android Studio
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Firebase (sensitive)
+google-services.json
+
+# Signing
+*.keystore
+*.jks
+app/dummy.keystore
+
+# Gradle properties (contains signing passwords)
+gradle.properties
+
+# Output files
+*.apk
+*.aab
+
+# OS files
+Thumbs.db
