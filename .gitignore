@@ -32,3 +32,8 @@ gradle.properties
 
 # OS files
 Thumbs.db
+.idea/
+.kotlin/
+.vscode/
+.firebase/
+.firebaserc
