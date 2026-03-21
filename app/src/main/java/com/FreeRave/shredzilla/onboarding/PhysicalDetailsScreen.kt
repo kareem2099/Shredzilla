@@ -33,9 +33,9 @@ fun PhysicalDetailsScreen(onDetailsSubmitted: (age: String, height: String, weig
 
     val gender = ThemeManager.currentGenderTheme
     val backgroundImageRes = if (gender == "Female") {
-        R.drawable.sec_page_female 
+        R.drawable.sec_page_female
     } else {
-        R.drawable.sec_page 
+        R.drawable.sec_page
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -43,7 +43,7 @@ fun PhysicalDetailsScreen(onDetailsSubmitted: (age: String, height: String, weig
             painter = painterResource(id = backgroundImageRes),
             contentDescription = "Background",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop 
+            contentScale = ContentScale.Crop
         )
 
         Column(

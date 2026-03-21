@@ -1,5 +1,6 @@
 package com.FreeRave.shredzilla.auth
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,10 +28,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -57,8 +61,10 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     isLoading: Boolean = false
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
 
     // Determine if overall app is in dark mode (respecting user's theme choice)
     val currentGender = ThemeManager.currentGenderTheme
@@ -145,7 +151,14 @@ fun LoginScreen(
                     CircularProgressIndicator(modifier = Modifier.padding(bottom = 16.dp))
                 } else {
                     Button(
-                        onClick = { onLoginClick(email, password) },
+                        onClick = { 
+                            focusManager.clearFocus()
+                            if (email.isNotBlank() && password.isNotBlank()) {
+                                onLoginClick(email.trim(), password) 
+                            } else {
+                                Toast.makeText(context, "Please enter both email and password.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.buttonColors(
@@ -160,6 +173,7 @@ fun LoginScreen(
 
                 Button(
                     onClick = onGoogleSignInClick,
+                    enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.buttonColors(

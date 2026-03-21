@@ -12,6 +12,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.FreeRave.shredzilla.viewmodels.MainViewModel
 import com.FreeRave.shredzilla.auth.FirebaseEmailPasswordAuth
 import com.FreeRave.shredzilla.auth.FirebaseGoogleAuth
 import com.FreeRave.shredzilla.composables.AppBottomNavigationBar
@@ -38,7 +40,10 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -54,30 +59,15 @@ import java.util.concurrent.TimeUnit
 fun MainAppContainer(
     mainNavController: NavHostController,
     firebaseEmailAuthManager: FirebaseEmailPasswordAuth,
-    firebaseGoogleAuthManager: FirebaseGoogleAuth
+    firebaseGoogleAuthManager: FirebaseGoogleAuth,
+    mainViewModel: MainViewModel = viewModel()
 ) {
     val bottomBarNavController = rememberNavController()
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val db = Firebase.firestore // db instance for operations not yet moved to UserDataManager (like create/edit list)
 
-    val userDataManager = remember {
-        UserDataManager(
-            context = context,
-            onThemePreferenceChanged = { malePref, femalePref ->
-                ThemeManager.updateThemePreferenceForGender("Male", malePref)
-                ThemeManager.updateThemePreferenceForGender("Female", femalePref)
-            }
-        )
-    }
-
-    val timerManager = remember {
-        TimerManager(
-            context = context,
-            coroutineScope = coroutineScope,
-            userRestTimePreferenceProvider = { userDataManager.userRestTimePreference }
-        )
-    }
+    val userDataManager = mainViewModel.userDataManager
+    val timerManager = mainViewModel.timerManager
 
     LaunchedEffect(userDataManager.userRestTimePreference) {
         timerManager.updateTotalSecondsFromPreference()
@@ -199,41 +189,52 @@ fun MainAppContainer(
             composable(AppRoutes.ACCOUNT_SETTINGS) {
                 val user = firebaseEmailAuthManager.getCurrentUser()
                 AccountScreen(
-                    { bottomBarNavController.popBackStack() },
-                    { firebaseEmailAuthManager.signOut(); firebaseGoogleAuthManager.signOut(); ThemeManager.currentGenderTheme = null; mainNavController.navigate(AppRoutes.AUTH) { popUpTo(mainNavController.graph.startDestinationId) { inclusive = true }; launchSingleTop = true } },
-                    { bottomBarNavController.navigate(AppRoutes.UPDATE_USERNAME) },
-                    user?.email,
-                    user?.displayName,
-                    userDataManager.userProfileImageLocalPath,
-                    { newPath -> userDataManager.updateProfileImagePathInFirestore(newPath, currentUser) }
+                    onNavigateBack = { bottomBarNavController.popBackStack() },
+                    onSignOut = { firebaseEmailAuthManager.signOut(); firebaseGoogleAuthManager.signOut(); userDataManager.clearAllListeners(); ThemeManager.currentGenderTheme = null; mainNavController.navigate(AppRoutes.AUTH) { popUpTo(mainNavController.graph.startDestinationId) { inclusive = true }; launchSingleTop = true } },
+                    onNavigateToUpdateUsername = { bottomBarNavController.navigate(AppRoutes.UPDATE_USERNAME) },
+                    userEmail = user?.email,
+                    userName = user?.displayName,
+                    profileImageUrl = userDataManager.userProfileImageLocalPath,
+                    isDeletingAccount = mainViewModel.isDeletingAccount,
+                    onUpdateProfileImagePathInFirestore = { newPath -> userDataManager.updateProfileImagePathInFirestore(newPath, currentUser) },
+                    onDeleteAccount = { onSuccess, onError ->
+                        mainViewModel.deleteUserAccount(
+                            onSuccess = {
+                                userDataManager.clearAllListeners()
+                                onSuccess()
+                            },
+                            onError = onError
+                        )
+                    }
                 )
             }
             composable(AppRoutes.UPDATE_USERNAME) {
                 val user = firebaseEmailAuthManager.getCurrentUser()
-                UpdateUsernameScreen({ bottomBarNavController.popBackStack() }, user?.displayName)
+                UpdateUsernameScreen(
+                    onNavigateBack = { bottomBarNavController.popBackStack() }, 
+                    currentUsername = user?.displayName,
+                    isUpdatingUsername = mainViewModel.isUpdatingUsername,
+                    onUpdateUsername = { newUsername, onSuccess, onError ->
+                        mainViewModel.updateUsername(newUsername, onSuccess, onError)
+                    }
+                )
             }
             composable(AppRoutes.UNIT_SETTINGS) {
                 UnitSettingsScreen({ bottomBarNavController.popBackStack() }, userDataManager.userUnitSystem) { newUnitSystem ->
-                    userDataManager.userUnitSystem = newUnitSystem // Update local state in manager
-                    currentUser?.uid?.let { userId ->
-                        db.collection("users").document(userId).set(mapOf("unitSystem" to newUnitSystem.name), SetOptions.merge())
-                    }
+                    userDataManager.userUnitSystem = newUnitSystem
+                    userDataManager.updateUserSetting(currentUser?.uid, "unitSystem", newUnitSystem.name)
                 }
             }
             composable(AppRoutes.WORKOUT_REMINDERS) {
                 WorkoutRemindersScreen({ bottomBarNavController.popBackStack() }, userDataManager.userWorkoutReminderSetting) { newSetting ->
                     userDataManager.userWorkoutReminderSetting = newSetting
-                    currentUser?.uid?.let { userId ->
-                        db.collection("users").document(userId).set(mapOf("workoutReminder" to newSetting), SetOptions.merge())
-                    }
+                    userDataManager.updateUserSetting(currentUser?.uid, "workoutReminder", newSetting)
                 }
             }
             composable(AppRoutes.DEFAULT_REST_TIME_SETTINGS) {
                 DefaultRestTimeSettingsScreen(userDataManager.userRestTimePreference, { newPreference ->
                     userDataManager.userRestTimePreference = newPreference
-                    currentUser?.uid?.let { userId ->
-                        db.collection("users").document(userId).set(mapOf("restTimePreference" to newPreference), SetOptions.merge())
-                    }
+                    userDataManager.updateUserSetting(currentUser?.uid, "restTimePreference", newPreference)
                     bottomBarNavController.popBackStack()
                 }, { bottomBarNavController.popBackStack() })
             }
@@ -246,13 +247,8 @@ fun MainAppContainer(
                     onThemeSettingChange = { newThemeSetting ->
                         val fieldToUpdate = if (currentGender == "Male") "themePreferenceMale" else "themePreferenceFemale"
                         if (currentGender == "Male") userDataManager.themePreferenceMale = newThemeSetting else userDataManager.themePreferenceFemale = newThemeSetting
-
                         ThemeManager.updateThemePreferenceForGender(currentGender, newThemeSetting)
-
-                        currentUser?.uid?.let { userId ->
-                            db.collection("users").document(userId)
-                                .set(mapOf(fieldToUpdate to newThemeSetting.name), SetOptions.merge())
-                        }
+                        userDataManager.updateUserSetting(currentUser?.uid, fieldToUpdate, newThemeSetting.name)
                     }
                 )
             }

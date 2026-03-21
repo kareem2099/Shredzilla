@@ -9,10 +9,8 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.google.firebase.auth.FirebaseAuth 
 import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.tasks.await 
+import com.google.firebase.ktx.Firebase 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -59,14 +57,15 @@ fun AccountScreen(
     userEmail: String?,
     userName: String?,
     profileImageUrl: String?, 
-    onUpdateProfileImagePathInFirestore: (String?) -> Unit
+    isDeletingAccount: Boolean,
+    onUpdateProfileImagePathInFirestore: (String?) -> Unit,
+    onDeleteAccount: (() -> Unit, (Exception) -> Unit) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var currentSheetStage by remember { mutableStateOf(ProfileImageSheetStage.NONE) }
     
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showRemoveImageConfirmDialog by remember { mutableStateOf(false) }
-    var isLoadingDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -248,49 +247,39 @@ fun AccountScreen(
     if (showDeleteConfirmDialog) {
         // ... (Delete Account AlertDialog remains the same) ...
         AlertDialog(
-            onDismissRequest = { if (!isLoadingDelete) showDeleteConfirmDialog = false },
+            onDismissRequest = { if (!isDeletingAccount) showDeleteConfirmDialog = false },
             title = { Text("Delete Account") },
             text = { Text("Are you sure you want to permanently delete your account? This action cannot be undone.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        isLoadingDelete = true
-                        scope.launch {
-                            val user = FirebaseAuth.getInstance().currentUser
-                            if (user != null) {
-                                try {
-                                    Firebase.firestore.collection("users").document(user.uid).delete().await()
-                                    user.delete().await()
-                                    Toast.makeText(context, "Account deleted successfully.", Toast.LENGTH_SHORT).show()
-                                    onSignOut() 
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Error deleting account: ${e.message}", Toast.LENGTH_LONG).show()
-                                    Log.e("AccountScreen", "Error deleting account", e)
-                                    if (e is com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException) {
-                                        Toast.makeText(context, "Please sign out and sign back in to delete your account.", Toast.LENGTH_LONG).show()
-                                    }
-                                } finally {
-                                    isLoadingDelete = false
-                                    showDeleteConfirmDialog = false 
+                        onDeleteAccount(
+                            { // onSuccess
+                                Toast.makeText(context, "Account deleted successfully.", Toast.LENGTH_SHORT).show()
+                                showDeleteConfirmDialog = false
+                                onSignOut()
+                            },
+                            { e -> // onError
+                                Toast.makeText(context, "Error deleting account: ${e.message}", Toast.LENGTH_LONG).show()
+                                Log.e("AccountScreen", "Error deleting account", e)
+                                if (e is com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException) {
+                                    Toast.makeText(context, "Please sign out and sign back in to delete your account.", Toast.LENGTH_LONG).show()
                                 }
-                            } else {
-                                Toast.makeText(context, "Not logged in.", Toast.LENGTH_SHORT).show()
-                                isLoadingDelete = false
-                                showDeleteConfirmDialog = false 
+                                showDeleteConfirmDialog = false
                             }
-                        }
+                        )
                     },
-                    enabled = !isLoadingDelete
+                    enabled = !isDeletingAccount
                 ) {
-                    if (isLoadingDelete) { CircularProgressIndicator(modifier = Modifier.size(20.dp)) } 
+                    if (isDeletingAccount) { CircularProgressIndicator(modifier = Modifier.size(20.dp)) } 
                     else { Text("Yes, Delete", color = MaterialTheme.colorScheme.error) }
                 }
             },
-            dismissButton = { TextButton(onClick = { if (!isLoadingDelete) showDeleteConfirmDialog = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { if (!isDeletingAccount) showDeleteConfirmDialog = false }) { Text("Cancel") } }
         )
     }
 
-    if (isLoadingDelete) {
+    if (isDeletingAccount) {
         Box(
             modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(enabled = false, onClick = {}),
             contentAlignment = Alignment.Center
@@ -304,7 +293,7 @@ fun AccountScreen(
 @Composable
 fun AccountScreenDarkPreview() {
     ShredzillaTheme { // Removed darkTheme = true
-        AccountScreen(onNavigateBack = {}, onSignOut = {}, onNavigateToUpdateUsername = {}, userEmail = "kareem209907@gmail.com", userName = "Kareem Ehab", profileImageUrl = null, onUpdateProfileImagePathInFirestore = {})
+        AccountScreen(onNavigateBack = {}, onSignOut = {}, onNavigateToUpdateUsername = {}, userEmail = "kareem209907@gmail.com", userName = "Kareem Ehab", profileImageUrl = null, isDeletingAccount = false, onUpdateProfileImagePathInFirestore = {}, onDeleteAccount = { _, _ -> })
     }
 }
 
@@ -312,6 +301,6 @@ fun AccountScreenDarkPreview() {
 @Composable
 fun AccountScreenLightPreview() {
     ShredzillaTheme { // Removed darkTheme = false
-        AccountScreen(onNavigateBack = {}, onSignOut = {}, onNavigateToUpdateUsername = {}, userEmail = "kareem209907@gmail.com", userName = null, profileImageUrl = null, onUpdateProfileImagePathInFirestore = {})
+        AccountScreen(onNavigateBack = {}, onSignOut = {}, onNavigateToUpdateUsername = {}, userEmail = "kareem209907@gmail.com", userName = null, profileImageUrl = null, isDeletingAccount = false, onUpdateProfileImagePathInFirestore = {}, onDeleteAccount = { _, _ -> })
     }
 }

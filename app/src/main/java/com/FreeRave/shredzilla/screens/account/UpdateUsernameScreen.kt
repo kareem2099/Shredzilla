@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -18,19 +19,17 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpdateUsernameScreen(
     onNavigateBack: () -> Unit,
-    currentUsername: String?
+    currentUsername: String?,
+    isUpdatingUsername: Boolean,
+    onUpdateUsername: (String, () -> Unit, (Exception) -> Unit) -> Unit
 ) {
-    var username by remember { mutableStateOf(currentUsername ?: "") }
-    var isLoading by remember { mutableStateOf(false) }
+    var username by rememberSaveable { mutableStateOf(currentUsername ?: "") }
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -66,40 +65,21 @@ fun UpdateUsernameScreen(
                         Toast.makeText(context, "Username cannot be empty.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    isLoading = true
-                    scope.launch {
-                        val firebaseUser = FirebaseAuth.getInstance().currentUser
-                        if (firebaseUser == null) {
-                            Toast.makeText(context, "Not logged in.", Toast.LENGTH_SHORT).show()
-                            isLoading = false
-                            return@launch
-                        }
-
-                        try {
-                            // Update Firestore
-                            Firebase.firestore.collection("users").document(firebaseUser.uid)
-                                .update("name", username)
-                                .await()
-
-                            // Update Firebase Auth display name
-                            val profileUpdates = UserProfileChangeRequest.Builder()
-                                .setDisplayName(username)
-                                .build()
-                            firebaseUser.updateProfile(profileUpdates).await()
-                            
+                    onUpdateUsername(
+                        username,
+                        { // onSuccess
                             Toast.makeText(context, "Username updated successfully!", Toast.LENGTH_SHORT).show()
-                            isLoading = false
                             onNavigateBack()
-                        } catch (e: Exception) {
+                        },
+                        { e -> // onError
                             Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            isLoading = false
                         }
-                    }
+                    )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
+                enabled = !isUpdatingUsername
             ) {
-                if (isLoading) {
+                if (isUpdatingUsername) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 } else {
                     Text("Save Username")
@@ -113,6 +93,6 @@ fun UpdateUsernameScreen(
 @Composable
 fun UpdateUsernameScreenPreview() {
     ShredzillaTheme {
-        UpdateUsernameScreen(onNavigateBack = {}, currentUsername = "Old Username")
+        UpdateUsernameScreen(onNavigateBack = {}, currentUsername = "Old Username", isUpdatingUsername = false, onUpdateUsername = { _, _, _ -> })
     }
 }

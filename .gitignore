@@ -37,3 +37,6 @@ Thumbs.db
 .vscode/
 .firebase/
 .firebaserc
+
+# Local Tracking
+todo_list*.json

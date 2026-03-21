@@ -48,10 +48,19 @@ class UserDataManager(
     var todayTotalSets by mutableIntStateOf(0)
     var todayUniqueExercises by mutableIntStateOf(0)
 
+    // --- Listener Management ---
+    private val listeners = mutableListOf<com.google.firebase.firestore.ListenerRegistration>()
+
+    fun clearAllListeners() {
+        listeners.forEach { it.remove() }
+        listeners.clear()
+        todaySetsListener = null
+    }
+
     // --- Firestore Listeners ---
     fun setupFirestoreListeners(currentUser: FirebaseUser?) {
         // Listener for commonExercises
-        db.collection("commonExercises").orderBy("name")
+        val commonExercisesRegistration = db.collection("commonExercises").orderBy("name")
             .addSnapshotListener { snapshots, e ->
                 if (e != null) {
                     Log.w("Firestore", "Listen failed for commonExercises.", e)
@@ -64,10 +73,11 @@ class UserDataManager(
                 masterExerciseList.clear()
                 masterExerciseList.addAll(exercises.distinct())
             }
+        listeners.add(commonExercisesRegistration)
 
         currentUser?.uid?.let { userId ->
             // Listener for user document
-            db.collection("users").document(userId)
+            val userDocRegistration = db.collection("users").document(userId)
                 .addSnapshotListener { userDocSnapshot, e ->
                     if (e != null) {
                         Log.w("Firestore", "User doc listen failed for $userId.", e)
@@ -123,9 +133,10 @@ class UserDataManager(
                         Log.d("Firestore", "User document $userId not found.")
                     }
                 }
+            listeners.add(userDocRegistration)
 
             // Listener for user's exercise lists
-            db.collection("users").document(userId).collection("exerciseLists")
+            val exerciseListsRegistration = db.collection("users").document(userId).collection("exerciseLists")
                 .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .addSnapshotListener { listsSnapshot, e ->
                     if (e != null) {
@@ -149,16 +160,29 @@ class UserDataManager(
                     }
                     userExerciseLists = currentLists
                 }
+            listeners.add(exerciseListsRegistration)
 
             // Listener for today's recorded sets
-            val todayDateStr =
-                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Timestamp.now().toDate())
-            db.collection("users").document(userId).collection("dailyActivity")
-                .document(todayDateStr).collection("recordedSets")
-                .orderBy(
-                    "timestamp",
-                    com.google.firebase.firestore.Query.Direction.ASCENDING
-                ) // Order by time
+            setupTodaySetsListener(userId)
+        }
+    }
+
+    private var todaySetsListener: com.google.firebase.firestore.ListenerRegistration? = null
+
+    fun setupTodaySetsListener(userId: String) {
+        val oldListener = todaySetsListener
+        if (oldListener != null) {
+            oldListener.remove()
+            listeners.remove(oldListener)
+        }
+        val todayDateStr =
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Timestamp.now().toDate())
+        todaySetsListener = db.collection("users").document(userId).collection("dailyActivity")
+            .document(todayDateStr).collection("recordedSets")
+            .orderBy(
+                "timestamp",
+                com.google.firebase.firestore.Query.Direction.ASCENDING
+            ) // Order by time
                 .addSnapshotListener { setsSnapshot, e ->
                     if (e != null) {
                         Log.w(
@@ -201,7 +225,7 @@ class UserDataManager(
                     todayTotalReps = repsCount; todayTotalSets = setsCount; todayUniqueExercises =
                     uniqueExNames.size
                 }
-        }
+        todaySetsListener?.let { listeners.add(it) }
     }
 
     // --- Data Modification Functions ---
@@ -248,24 +272,8 @@ class UserDataManager(
     }
 
     fun updateProfileImagePathInFirestore(newPath: String?, currentUser: FirebaseUser?) {
-        currentUser?.uid?.let { userId ->
-            val userDocRef = db.collection("users").document(userId)
-            val updateData = hashMapOf<String, Any?>("profileImageLocalPath" to newPath)
-            userDocRef.set(updateData, SetOptions.merge())
-                .addOnSuccessListener {
-                    Log.d(
-                        "Firestore",
-                        "Profile image path updated to: $newPath"
-                    ); userProfileImageLocalPath = newPath
-                }
-                .addOnFailureListener { e ->
-                    Log.e(
-                        "Firestore",
-                        "Error updating profile image path",
-                        e
-                    )
-                }
-        }
+        updateUserSetting(currentUser?.uid, "profileImageLocalPath", newPath)
+        userProfileImageLocalPath = newPath
     }
 
     fun recordSet(
@@ -277,8 +285,7 @@ class UserDataManager(
     ) {
         val exId = exerciseName.lowercase().replace(" ", "_")
         val ts = Timestamp.now()
-        val weightInKg =
-            if (userUnitSystem == UnitSystem.IMPERIAL) weightInput * 0.45359237 else weightInput
+        val weightInKg = convertToStorageWeight(weightInput)
 
         currentUser?.uid?.let { userId ->
             val userDocRef = db.collection("users").document(userId)
@@ -412,8 +419,7 @@ class UserDataManager(
                     .collection("dailyActivity").document(setDateStr)
                     .collection("recordedSets").document(firestoreDocId)
 
-                val weightInKgForUpdate =
-                    if (userUnitSystem == UnitSystem.IMPERIAL) newWeight * 0.45359237 else newWeight
+                val weightInKgForUpdate = convertToStorageWeight(newWeight)
                 val updatedSetData = mapOf( // Use mapOf for type safety with update
                     "reps" to newReps.toLong(), // Firestore expects Long for integer numbers
                     "weight" to weightInKgForUpdate,
@@ -446,5 +452,21 @@ class UserDataManager(
                     }
             }
         }
+    }
+
+    // DRY Helper for settings updates
+    fun updateUserSetting(userId: String?, key: String, value: Any?) {
+        if (userId.isNullOrEmpty()) return
+        db.collection("users").document(userId).set(hashMapOf(key to value), SetOptions.merge())
+            .addOnFailureListener { e -> Log.e("Firestore", "Failed to update setting $key", e) }
+    }
+
+    // DRY Helper for unit conversion
+    fun convertToStorageWeight(displayWeight: Double): Double {
+        return if (userUnitSystem == UnitSystem.IMPERIAL) displayWeight * 0.45359237 else displayWeight
+    }
+
+    fun convertToDisplayWeight(storageWeightKg: Double): Double {
+        return if (userUnitSystem == UnitSystem.IMPERIAL) storageWeightKg / 0.45359237 else storageWeightKg
     }
 }

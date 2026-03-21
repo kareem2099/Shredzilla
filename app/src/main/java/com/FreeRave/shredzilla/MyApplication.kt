@@ -67,17 +67,9 @@ class MyApplication : Application(), Application.ActivityLifecycleCallbacks, Def
 
     override fun onActivityResumed(activity: Activity) {
         // currentActivity is updated in onActivityStarted.
-        // This callback is crucial for showing the ad after SplashActivity finishes,
-        // or when any non-Splash, non-Ad, non-SignIn activity resumes.
-        val activityClassName = activity.javaClass.name
-        if (activity !is SplashActivity && activityClassName != "com.google.android.gms.ads.AdActivity" && activityClassName != "com.google.android.gms.auth.api.signin.internal.SignInHubActivity") {
-            Log.d(LOG_TAG, "Activity resumed: ${activity.localClassName} (not Splash/Ad/SignIn). Attempting to show App Open Ad via onActivityResumed.")
-            appOpenAdManager.showAdIfAvailable(activity)
-        } else if (activity is SplashActivity) {
-            Log.d(LOG_TAG, "Activity resumed: SplashActivity. No ad shown by onActivityResumed.")
-        } else { // It's an AdActivity or SignInHubActivity
-            Log.d(LOG_TAG, "Activity resumed: AdActivity or SignInHubActivity (${activity.localClassName}). No ad shown by onActivityResumed.")
-        }
+        // App Open Ads display on resume is removed.
+        // Relying purely on onStart (process foregrounding) to show App Open Ads correctly.
+        Log.d(LOG_TAG, "Activity resumed: ${activity.localClassName}")
     }
 
     override fun onActivityPaused(activity: Activity) {}

@@ -40,18 +40,27 @@ class FirebaseGoogleAuth(private val context: Context) {
             val authResult = auth.signInWithCredential(credential).await()
             val firebaseUser = authResult.user!!
 
-            // Save/update user details in Firestore
-            val user = hashMapOf(
-                "uid" to firebaseUser.uid,
-                "name" to firebaseUser.displayName,
-                "email" to firebaseUser.email
-            )
-            // Use SetOptions.merge() to avoid overwriting existing onboarding data
-            db.collection("users").document(firebaseUser.uid).set(user, com.google.firebase.firestore.SetOptions.merge()).await()
+            try {
+                // Save/update user details in Firestore
+                val user = hashMapOf(
+                    "uid" to firebaseUser.uid,
+                    "name" to firebaseUser.displayName,
+                    "email" to firebaseUser.email
+                )
+                // Use SetOptions.merge() to avoid overwriting existing onboarding data
+                db.collection("users").document(firebaseUser.uid).set(user, com.google.firebase.firestore.SetOptions.merge()).await()
 
-            Result.success(firebaseUser)
+                Result.success(firebaseUser)
+            } catch (e: Exception) {
+                signOut() // Prevents zombie states if Firestore set() fails and logs out completely
+                Result.failure(Exception("Database sync failed. Please try again.", e))
+            }
         } catch (e: Exception) {
-            Result.failure(e)
+            if (e is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                Result.failure(Exception("An account already exists with this email using a password. Please login using your email and password.", e))
+            } else {
+                Result.failure(Exception("Google Sign-In failed or database sync interrupted. Please try again.", e))
+            }
         }
     }
 
