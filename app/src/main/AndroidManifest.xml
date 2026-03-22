@@ -42,7 +42,6 @@
         <activity
             android:name=".SplashActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.Shredzilla.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -51,22 +50,14 @@
         </activity>
         <activity
             android:name=".MainActivity"
-            android:exported="true" 
-            android:label="@string/app_name"
+            android:exported="true"
             android:theme="@style/Theme.Shredzilla">
-            {/* MainActivity will be launched by SplashActivity, 
-                but also needs to be exported if it's the de-facto main entry after splash.
-                Alternatively, keep SplashActivity as the sole LAUNCHER and it starts MainActivity.
-                For simplicity with current SplashActivity logic, let's make MainActivity also exported for now,
-                though typically only one LAUNCHER activity is needed.
-                If SplashActivity *always* goes to MainActivity, MainActivity doesn't need LAUNCHER.
-            */}
+
         </activity>
-        {/* AuthActivity and OnboardingActivity are no longer separate activities */}
+
         <activity
             android:name=".FitnessActivity"
             android:exported="false"
-            android:label="@string/app_name"
             android:theme="@style/Theme.Shredzilla" />
 
         <service

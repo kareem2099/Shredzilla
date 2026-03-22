@@ -1,10 +1,14 @@
 {
-  "latestVersion": "1.0.3",
-  "latestVersionCode": 4,
+  "latestVersion": "1.2.0",
+  "latestVersionCode": 5,
   "url": "https://apkpure.com/p/com.FreeRave.shredzilla",
   "releaseNotes": [
-    "New awesome features!",
-    "Important bug fixes.",
-    "Improved app performance."
+    "Offline-First set logging — works perfectly in gym dead-zones.",
+    "Zero-drift rest timer — atomic precision regardless of CPU load.",
+    "Historical analytics with dynamic progress chart.",
+    "Date-selectable Today screen.",
+    "Debounced exercise search for smooth 60 FPS filtering.",
+    "Process Death resilience — never lose your navigation state.",
+    "Critical memory leak fixes and architecture improvements."
   ]
 }
