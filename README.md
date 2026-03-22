@@ -1,51 +1,143 @@
-# Shredzilla 🦖🏋️‍♂️
+# Shredzilla 🦖🏋️
 
-Shredzilla is a high-performance Android workout tracking application engineered with a focus on modern architecture, persistent state management, and seamless real-time data synchronization. Built natively using **Kotlin**, **Jetpack Compose**, and **Firebase**, it is designed to replace your notebook with a blazing-fast, crash-resistant experience tailored for serious weightlifters.
+> A high-performance Android workout tracking application built for serious weightlifters who demand speed, reliability, and a crash-resistant experience.
 
-## 🔥 Key Features (v1.1.0)
+[![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://android.com)
+[![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
+[![Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-blue.svg)](https://developer.android.com/jetpack/compose)
+[![Firebase](https://img.shields.io/badge/Backend-Firebase-orange.svg)](https://firebase.google.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-* **Bulletproof Architecture (State Hoisting):** Critical Firebase operations (Account Deletion, Username Updates) are safely hoisted into the `MainViewModel`. This ensures resilient background processing that completely survives Configuration Changes and Process Death without crashing the UI.
-* **Smart Memory Management:** Employs a rigorous `ListenerRegistration` caching system that actively severs and sweeps "Zombie" listeners and locally orphaned profile images to guarantee zero memory leaks upon user exits.
-* **Modern Authentication Flow:** Multi-provider support utilizing `FirebaseEmailPasswordAuth` and `FirebaseGoogleAuth` wrapped within a secure, multi-step Jetpack Compose Onboarding Flow.
-* **Real-time Synchronization:** Built on Firestore listeners that dynamically refresh state metrics—like dynamic midnight date resolutions for "Today's Sets"—keeping UX entirely reactive.
-* **Production-Grade UX:** Leverages dynamic Dark/Light themes, `rememberSaveable` to protect inputs, and beautiful Material 3 Design paradigms throughout the hierarchy.
+---
 
-## 🛠 Tech Stack
+## Overview
 
-* **Language:** Kotlin
-* **UI Framework:** Jetpack Compose (Material 3)
-* **Design Pattern:** MVVM (Model-View-ViewModel)
-* **Backend:** Firebase Authentication & Cloud Firestore
-* **Coroutines/Flow:** Complete use of asynchronous Kotlin Coroutines for safe background networking and UI StateFlows.
+Shredzilla replaces your workout notebook with a blazing-fast, offline-capable fitness tracker. It is engineered with a strict focus on **modern Android architecture**, **persistent state management**, and **seamless real-time data synchronization** — so your data is always safe, even in the deepest gym dead-zones.
 
-## 🚀 Getting Started
+---
 
-To run Shredzilla locally:
+## Features
+
+### Core Workout Experience
+- **Offline-First Set Logging** — Record sets instantly with zero latency. Firebase's native offline persistence silently syncs to the cloud once connectivity is restored.
+- **Zero-Drift Rest Timer** — Delta-math anchored countdown timer (`endTime - currentTimeMillis`) guarantees atomic precision regardless of CPU load or background threading. Survives app minimization without losing a single second.
+- **Debounced Exercise Search** — Kotlin `StateFlow` with a 300ms debounce prevents keystroke input lag and eliminates ANR risk during heavy list filtering.
+
+### Architecture & Stability
+- **Process Death Resilience** — `SavedStateHandle` + `StateFlow` preserves navigation destination across OS-level app kills. Users always return to exactly where they left off.
+- **Configuration Change Safety** — `MainViewModel` owns `TimerManager` and `UserDataManager`, anchoring their lifecycle to `viewModelScope` — completely immune to screen rotations.
+- **Zero Memory Leaks** — A strict `ListenerRegistration` cache in `UserDataManager` systematically severs all Firestore snapshot observers on logout and account deletion.
+- **Atomic User Creation** — Firestore write failure during registration triggers an automatic Firebase Auth rollback, eliminating zombie accounts stuck in a broken state.
+
+### Authentication
+- **Multi-Provider Auth** — Supports Email/Password and Google Sign-In via Firebase Authentication.
+- **Smart Onboarding Resume** — Detects exactly which onboarding step a user completed last and resumes from there on next launch.
+- **Collision Detection** — Gracefully handles duplicate email errors across providers with a clear, actionable error message.
+
+### Analytics & Data
+- **Progress Chart** — Dynamic Y-axis clamping with gradient fill renders volume progression curves that accurately represent micro-improvements without visual distortion.
+- **Historical Analytics** — Background computation on `Dispatchers.Default` aggregates up to 90 days of set data with session-level caching to prevent redundant Firestore reads.
+- **Unit System Support** — Full Metric (kg) and Imperial (lbs) support with centralized `convertToStorageWeight` / `convertToDisplayWeight` helpers ensuring consistent storage in kg regardless of display preference.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Language | Kotlin |
+| UI Framework | Jetpack Compose (Material 3) |
+| Architecture | MVVM + State Hoisting |
+| Backend | Firebase Authentication + Cloud Firestore |
+| Async | Kotlin Coroutines + StateFlow |
+| Ads | Google AdMob (App Open Ads + Rewarded Ads) |
+| Notifications | NotificationCompat (Rest Timer) |
+| Image Handling | Internal Storage + FileProvider |
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Android Studio (latest stable)
+- Android device or emulator running API 26+
+- A Firebase project
+
+### Setup
 
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/kareem2099/Shredzilla.git
+   cd Shredzilla
    ```
-2. **Setup Firebase:**
-   - Create a new project in the Firebase Console.
-   - Register an Android App using your package name (e.g., `com.FreeRave.shredzilla`).
-   - Download the generated `google-services.json` file.
-   - Drop the `google-services.json` file directly into the `app/` directory of the cloned project.
-   - Enable **Cloud Firestore** and **Authentication** (Email/Password, Google).
-3. **Build & Run:**
-   - Open the project in **Android Studio**.
-   - Sync Gradle.
-   - Build and run on an Android Emulator or physical device (Android API 26+ recommended).
 
-## 🗺 Roadmap (v1.2.0 Preview)
-We are currently focusing on the core workout experience:
-* **Today Screen Engine:** Zero-latency active-rest timers and Offline-First synchronization caching allowing you to log workouts flawlessly in gym dead-zones.
-* **Analytics Rendering:** Offloading heavy Total Volume computations to `Dispatchers.Default` threads to render massive Set Graphs flawlessly at 60 FPS.
-* *(See `todo_list(1.2.0).json` for the complete milestone).*
+2. **Configure Firebase:**
+   - Create a new project at [console.firebase.google.com](https://console.firebase.google.com)
+   - Register an Android app using the package name `com.FreeRave.shredzilla`
+   - Download `google-services.json` and place it in the `app/` directory
+   - Enable **Cloud Firestore** and **Authentication** (Email/Password + Google providers)
 
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page].
-If you want to contribute, please read the `CONTRIBUTING.md` file for details on our code of conduct, and the process for submitting pull requests to us.
+3. **Configure signing (for Release builds):**
+   Add the following to your `gradle.properties` (this file is `.gitignored` and never committed):
+   ```properties
+   SHREDZILLA_RELEASE_STORE_FILE=your_keystore.jks
+   SHREDZILLA_RELEASE_STORE_PASSWORD=your_store_password
+   SHREDZILLA_RELEASE_KEY_ALIAS=your_key_alias
+   SHREDZILLA_RELEASE_KEY_PASSWORD=your_key_password
+   ```
 
-## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+4. **Build & Run:**
+   - Open the project in Android Studio
+   - Sync Gradle
+   - Run on a device or emulator
+
+---
+
+## Roadmap
+
+### v1.2.0 — Core Workflow Stability *(Current)*
+- [x] Offline-First Optimistic UI for set logging
+- [x] Zero-Drift delta-math rest timer
+- [x] Debounced exercise search with ViewModel StateFlow
+- [x] Historical analytics with dynamic progress chart
+- [x] Date-selectable Today screen
+
+### v1.3.0 — UI Polish & Feature Completeness *(Planned)*
+- [ ] Real workout activity indicators on the day strip
+- [ ] Per-exercise chart selector
+- [ ] LazyColumn pagination for large exercise lists
+- [ ] Screen transition animations
+- [ ] Analytics cache via `SavedStateHandle`
+
+> See [`todo_list(v1.3.0).json`](todo_list(v1.3.0).json) for the complete milestone breakdown.
+
+---
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes (`git commit -m 'Add your feature'`)
+4. Push to the branch (`git push origin feature/your-feature`)
+5. Open a Pull Request
+
+Please ensure your code follows the existing architecture patterns (MVVM, State Hoisting, ViewModel-owned coroutines) before submitting.
+
+---
+
+## Security
+
+This repository does **not** contain:
+- `google-services.json`
+- `gradle.properties` (signing credentials)
+- Any `.keystore` or `.jks` files
+
+If you discover a security vulnerability, please open a private issue rather than a public one.
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

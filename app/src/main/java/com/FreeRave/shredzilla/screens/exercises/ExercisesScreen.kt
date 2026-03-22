@@ -19,6 +19,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 
 // Project-specific imports
@@ -39,7 +42,9 @@ enum class SortOption(val displayName: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExercisesScreen(
-    exercisesDisplayInfo: List<ExerciseDisplayInfo>, // Parameter name updated
+    exercisesDisplayInfo: List<ExerciseDisplayInfo>, // Now globally debounced and pre-filtered
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     onNavigateToAddExercise: () -> Unit,
     onNavigateBack: () -> Unit,
     onDeleteExercise: (String) -> Unit,
@@ -51,9 +56,11 @@ fun ExercisesScreen(
     unitSystem: UnitSystem, // New parameter
     navController: NavHostController // Added NavController
 ) {
-    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
+    // State Hoisting: Search query is now managed safely in the ViewModel via StateFlow
+    // var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     var showSortMenu by remember { mutableStateOf(false) }
     var selectedSortOption by remember { mutableStateOf<SortOption?>(null) }
+    val focusManager = LocalFocusManager.current
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showBottomSheet by remember { mutableStateOf(false) }
@@ -63,19 +70,12 @@ fun ExercisesScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var exerciseToDelete by remember { mutableStateOf<String?>(null) }
 
-    val displayedExercises = remember(searchQuery, selectedSortOption, exercisesDisplayInfo) {
+    val displayedExercises = remember(selectedSortOption, exercisesDisplayInfo) {
         derivedStateOf {
-            val filtered = if (searchQuery.text.isBlank()) {
-                exercisesDisplayInfo
-            } else {
-                exercisesDisplayInfo.filter {
-                    it.name.contains(searchQuery.text, ignoreCase = true)
-                }
-            }
             when (selectedSortOption) {
-                SortOption.ALPHABETICAL -> filtered.sortedBy { it.name }
-                SortOption.MOST_RECENTLY_DONE -> filtered // Placeholder
-                null -> filtered
+                SortOption.ALPHABETICAL -> exercisesDisplayInfo.sortedBy { it.name }
+                SortOption.MOST_RECENTLY_DONE -> exercisesDisplayInfo // Already naturally ordered or handled centrally
+                null -> exercisesDisplayInfo
             }
         }
     }
@@ -137,7 +137,7 @@ fun ExercisesScreen(
             ) {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = onSearchQueryChange,
                     placeholder = { Text("Search", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search Icon", tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier
@@ -165,10 +165,22 @@ fun ExercisesScreen(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .pointerInput(Unit) {
+                                detectDragGestures { _, _ ->
+                                    focusManager.clearFocus()
+                                }
+                            },
                         verticalArrangement = Arrangement.spacedBy(8.dp) // Added spacing
                     ) {
-                        items(displayedExercises.value, key = { it.name }) { exerciseInfo ->
+                        // 60 FPS Optimization: Explicitly declaring `key = { it.id }` forces Compose to memorize list allocations accurately during Debounced filtering!
+                        // `contentType` acts as a memory recycler, eliminating view recreation strain.
+                        items(
+                            items = displayedExercises.value,
+                            key = { it.id },
+                            contentType = { "ExerciseItem" }
+                        ) { exerciseInfo ->
                             SwipableExerciseListItem(
                                 exerciseName = exerciseInfo.name,
                                 lastPerformed = exerciseInfo.lastPerformed,
@@ -284,6 +296,8 @@ fun ExercisesScreenPreview() {
                 ExerciseDisplayInfo(id = "squat", name = "Preview Squat", lastPerformed = "Yesterday"),
                 ExerciseDisplayInfo(id = "deadlift", name = "Preview Deadlift", lastPerformed = "3 days ago")
             ),
+            searchQuery = "",
+            onSearchQueryChange = {},
             onNavigateToAddExercise = {},
             onNavigateBack = {},
             onDeleteExercise = {},

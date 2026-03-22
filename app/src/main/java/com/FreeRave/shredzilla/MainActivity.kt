@@ -36,8 +36,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var firebaseGoogleAuthManager: FirebaseGoogleAuth
     private lateinit var googleSignInLauncher: ActivityResultLauncher<Intent>
 
-    // ✅ إزلنا navController كـ member variable — كان بيسبب memory leak
-    // بدلاً منه بنستخدم state داخل setContent مباشرةً
+    // Removed navController as member variable — it was causing memory leaks
+    // Instead we use state inside setContent directly
     private val mainViewModel: MainViewModel by viewModels()
 
     private val TAG = "MainActivity"
@@ -46,10 +46,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate started")
 
-        // ✅ MobileAds.initialize اتحذفت من هنا — موجودة في MyApplication بالفعل
+        // UX Polish: If the app was killed while the timer was running, the notification gets stuck.
+        // Clearing it on fresh launch ensures it doesn't persist zombie-like.
+        NotificationUtils.cancelTimerRunningNotification(this)
+
+        // MobileAds.initialize removed from here — it's already in MyApplication
 
         NotificationUtils.createNotificationChannel(applicationContext)
-        // ✅ AppUpdater checks internally so no need for AppUpdaterUtils
+        // AppUpdater checks internally so no need for AppUpdaterUtils
         AppUpdater(this)
             .setUpdateFrom(UpdateFrom.JSON)
             .setUpdateJSON("https://fitnessapp-9b198.web.app/update-info.json")
@@ -91,12 +95,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // ✅ setContent مرة واحدة بس — بيراقب startDestination
+        // setContent once only — monitors startDestination
         setContent {
             val navController = rememberNavController()
             val startDestination by mainViewModel.startDestinationFlow.collectAsState()
-
-            // لما startDestination يتغير → navigate
+            // Reactively navigate when startDestination mutates
             LaunchedEffect(startDestination) {
                 val dest = startDestination ?: return@LaunchedEffect
                 navController.navigate(dest) {
@@ -105,7 +108,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // ✅ نبدأ بـ AUTH دايماً — والـ LaunchedEffect هيعمل redirect لو لزم
+            // Start with AUTH always — LaunchedEffect will redirect if needed
             AppNavigationHost(
                 navController = navController,
                 startDestination = AppRoutes.AUTH,
@@ -115,7 +118,7 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        // تشيك على اليوزر الحالي
+        // Check current user
         val currentUser = firebaseEmailAuthManager.getCurrentUser()
         if (savedInstanceState == null) {
             if (currentUser != null) {
@@ -130,7 +133,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ✅ الدالة دي بتحدد الـ destination بس — مش بتعمل navigate مباشرةً
+    // This function determines destination only — doesn't navigate directly
     private suspend fun checkOnboardingAndSetDestination(userId: String) {
         Log.d(TAG, "checkOnboardingAndSetDestination for: $userId")
         val userDataResult = firebaseEmailAuthManager.getUserData(userId)

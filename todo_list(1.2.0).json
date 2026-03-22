@@ -1,0 +1,31 @@
+{
+  "version": "1.2.0",
+  "status": "planned",
+  "description": "Core Workflow Execution, Set Tracking Reliability, and Performance Analytics Optimization.",
+  "planned_features": [
+    {
+      "module": "Today Screen (Active Workflow Engine)",
+      "tasks": [
+        "Audit Today Screen Composables specifically for excessive Local State vulnerabilities, moving any complex mutation logic strictly into the MainViewModel (State Hoisting).",
+        "Analyze the Active Workout Timer's background mechanics to guarantee zero-latency countdowns, independent of the Compose UI's Recomposition cycles.",
+        "Implement sophisticated Offline-First synchronization caching to allow weightlifters to log intense active sets continuously through gym dead-zones without lag, uploading implicitly upon reconnection."
+      ]
+    },
+    {
+      "module": "Exercises Database & Filtering",
+      "tasks": [
+        "Deconstruct the master exercises list rendering, implementing standard LazyColumn Pagination blocks for remarkably smooth frame-rates (60 FPS) when scrolling through hefty exercise arrays.",
+        "Supercharge the Exercise Search Bar algorithm; apply rigorous debouncing techniques to a Kotlin Flow state emitted right from the ViewModel to prevent keystroke input latency and ANRs.",
+        "Design polished navigation transition animations morphing fluidly into the specific Set Graph Detail Screen from standard LazyItems."
+      ]
+    },
+    {
+      "module": "Analytics Processing & Data Charting",
+      "tasks": [
+        "Identify heavyweight calculations (Total Volume summarization, massive temporal loops) currently bottlenecking the Composable, moving those executions firmly onto the ViewModel's asynchronous Dispatchers.Default threads.",
+        "Develop an algorithmic dynamic Y-Axis bounds calculator for SetGraphScreen to intelligently clamp ranges, accurately portraying macro-progressions without extreme graphical spikes masking micro-improvements.",
+        "Protect analytical mathematical aggregations using SavedStateHandle caches to maintain complex graph renderings flawlessly during spontaneous orientation pivots (Portrait -> Landscape)."
+      ]
+    }
+  ]
+}

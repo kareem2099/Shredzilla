@@ -22,6 +22,7 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 // Data classes that might be moved here or kept in a common 'models' package
@@ -163,22 +164,29 @@ class UserDataManager(
             listeners.add(exerciseListsRegistration)
 
             // Listener for today's recorded sets
-            setupTodaySetsListener(userId)
+            loadSetsForDate(userId)
         }
     }
 
+    var selectedDateStr by mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        private set
+
     private var todaySetsListener: com.google.firebase.firestore.ListenerRegistration? = null
 
-    fun setupTodaySetsListener(userId: String) {
+    fun loadSetsForDate(userId: String, targetDate: Date = Date()) {
+        val newDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(targetDate)
+        if (newDateStr == selectedDateStr && todaySetsListener != null) return
+        
+        selectedDateStr = newDateStr
+
         val oldListener = todaySetsListener
         if (oldListener != null) {
             oldListener.remove()
             listeners.remove(oldListener)
         }
-        val todayDateStr =
-            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Timestamp.now().toDate())
+        
         todaySetsListener = db.collection("users").document(userId).collection("dailyActivity")
-            .document(todayDateStr).collection("recordedSets")
+            .document(selectedDateStr).collection("recordedSets")
             .orderBy(
                 "timestamp",
                 com.google.firebase.firestore.Query.Direction.ASCENDING
@@ -187,7 +195,7 @@ class UserDataManager(
                     if (e != null) {
                         Log.w(
                             "Firestore",
-                            "Today's sets listen failed for $userId on $todayDateStr.",
+                            "Today's sets listen failed for $userId on $selectedDateStr.",
                             e
                         )
                         todayRecordedSetsList = emptyList(); todayTotalReps = 0; todayTotalSets =
@@ -310,18 +318,21 @@ class UserDataManager(
                 "timestamp" to ts
             )
 
+            // Optimistic UI Update: Execute locally BEFORE the network request to guarantee 0ms latency.
+            val optimisticDocId = "pending_${java.util.UUID.randomUUID()}"
+            updateLocalExerciseSetInList(
+                exerciseName,
+                reps,
+                weightInput,
+                notes,
+                ts,
+                optimisticDocId
+            )
+
             userDocRef.collection("dailyActivity").document(todayDate).collection("recordedSets")
                 .add(setData)
                 .addOnSuccessListener { documentReference ->
-                    val firestoreDocumentId = documentReference.id
-                    updateLocalExerciseSetInList(
-                        exerciseName,
-                        reps,
-                        weightInput,
-                        notes,
-                        ts,
-                        firestoreDocumentId
-                    )
+                    // The set is already visible to the user. Firestore Native Offline Persistence handles the rest!
                 }
                 .addOnFailureListener { e ->
                     Log.e("Firestore", "Error adding set to dailyActivity for $exerciseName", e)

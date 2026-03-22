@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,13 +40,21 @@ import com.FreeRave.shredzilla.composables.RestTimerBar
 import com.FreeRave.shredzilla.models.UserExerciseList
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items // Reverting to basic items
-import androidx.compose.foundation.lazy.itemsIndexed // Keep just in case, but will try basic items first
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.CircularProgressIndicator
+import com.FreeRave.shredzilla.viewmodels.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetGraphScreen(
+    analyticsGraphData: Map<String, List<MainViewModel.ChartDataPoint>>,
+    isAnalyticsLoading: Boolean,
     exerciseCount: Int,
     userExerciseLists: List<UserExerciseList>, // New parameter for user's lists
     onNavigateToSettings: () -> Unit,
@@ -75,6 +84,15 @@ fun SetGraphScreen(
                 )
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onNavigateToCreateNewList,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Create New List")
+            }
+        },
         content = { paddingValues ->
             Column(
                 modifier = Modifier
@@ -94,12 +112,26 @@ fun SetGraphScreen(
                         .padding(16.dp)
                         .fillMaxSize()
                 ) {
-                    SetGraphCard(
-                        title = "New List", 
-                        showPlusIcon = true,
-                        onClick = onNavigateToCreateNewList // Use the new callback
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    if (isAnalyticsLoading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
+                    } else { // It's either empty or has data
+                        Text(
+                            "Overall Progress",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        val primaryExerciseId = analyticsGraphData.entries.maxByOrNull { it.value.size }?.key
+                        if (analyticsGraphData.isNotEmpty() && primaryExerciseId != null && analyticsGraphData[primaryExerciseId]!!.size > 1) {
+                            ProgressChartCanvas(
+                                dataPoints = analyticsGraphData[primaryExerciseId]!!, 
+                                modifier = Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp)
+                            )
+                        } else {
+                            Text("Complete more workouts to unlock your Progress Chart!", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                     SetGraphCard(
                         count = exerciseCount.toString(),
                         title = "Exercises",
@@ -114,7 +146,10 @@ fun SetGraphScreen(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             // Reverting to basic items without key to see if it resolves compiler issue
                             items(userExerciseLists) { exerciseList -> 
                                 SetGraphCard(
@@ -194,11 +229,78 @@ fun SetGraphCard(
     }
 }
 
+// Pro-Tip: Advanced Canvas Drawing for dynamic Y-Axis bounds.
+// Mathematical clamping prevents outliers from aggressively compressing the graph.
+@Composable
+fun ProgressChartCanvas(dataPoints: List<MainViewModel.ChartDataPoint>, modifier: Modifier = Modifier) {
+    if (dataPoints.isEmpty() || dataPoints.size < 2) return
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    // Pro-Tip: Adding Gradient Fill for Premium Look
+    val gradientBrush = Brush.verticalGradient(
+        colors = listOf(
+            primaryColor.copy(alpha = 0.4f), 
+            Color.Transparent
+        )
+    )
+
+    // Dynamic Bounds Evaluation
+    val maxVolume = dataPoints.maxOf { it.totalVolume }.toFloat()
+    val minVolume = dataPoints.minOf { it.totalVolume }.toFloat()
+    
+    // Pro-Tip: Safe Division & Clamping
+    val volumeRange = if (maxVolume > minVolume) (maxVolume - minVolume) else 1f // Prevent division by zero entirely
+
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val pointSpacing = width / (dataPoints.size - 1).toFloat()
+
+        val path = Path()
+        val fillPath = Path() // New path for the gradient fill
+
+        dataPoints.forEachIndexed { index, point ->
+            val safeVolume = point.totalVolume.toFloat()
+            // If all values are equal, draw the straight line exactly centered at 0.5f
+            val normalizedY = if (maxVolume == minVolume) 0.5f else 1f - ((safeVolume - minVolume) / volumeRange)
+            val yPos = (normalizedY * height * 0.8f) + (height * 0.1f)
+            val xPos = index * pointSpacing
+
+            if (index == 0) {
+                path.moveTo(xPos, yPos)
+                fillPath.moveTo(xPos, yPos)
+            } else {
+                path.lineTo(xPos, yPos)
+                fillPath.lineTo(xPos, yPos)
+            }
+        }
+
+        // Close the path to allow bottom contour gradient fill
+        fillPath.lineTo(width, height)
+        fillPath.lineTo(0f, height)
+        fillPath.close()
+
+        // Draw the gradient beneath the main stroke line
+        drawPath(
+            path = fillPath,
+            brush = gradientBrush
+        )
+
+        drawPath(
+            path = path,
+            color = primaryColor,
+            style = Stroke(width = 4.dp.toPx())
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun SetGraphScreenPreview() {
-    ShredzillaTheme { // Removed darkTheme = true
+    ShredzillaTheme {
         SetGraphScreen(
+            analyticsGraphData = emptyMap(),
+            isAnalyticsLoading = false,
             exerciseCount = 10,
             userExerciseLists = listOf(
                 UserExerciseList("1", "Upper Body A", listOf("ex1", "ex2")),

@@ -38,5 +38,3 @@ Thumbs.db
 .firebase/
 .firebaserc
 
-# Local Tracking
-todo_list*.json

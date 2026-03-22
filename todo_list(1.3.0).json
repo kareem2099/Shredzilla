@@ -1,0 +1,155 @@
+{
+    "version": "1.3.0",
+    "status": "planned",
+    "description": "UI Polish, Performance Hardening, and Feature Completeness Sprint.",
+    "carried_over_from_v1.2.0": [
+        {
+            "id": "CO-1",
+            "module": "Exercises Screen",
+            "task": "LazyColumn Pagination",
+            "reason": "Not implemented yet. Required when masterExerciseList grows large.",
+            "priority": "medium"
+        },
+        {
+            "id": "CO-2",
+            "module": "Navigation",
+            "task": "Screen Transition Animations",
+            "reason": "No enter/exit animations between screens yet. Affects UX feel significantly.",
+            "priority": "medium"
+        },
+        {
+            "id": "CO-3",
+            "module": "Analytics / MainViewModel",
+            "task": "SavedStateHandle cache for analyticsGraphData",
+            "reason": "Chart data is lost on Process Death. Currently only cached in MutableStateFlow.",
+            "priority": "high"
+        }
+    ],
+    "new_features": [
+        {
+            "id": "F-1",
+            "module": "Today Screen",
+            "task": "Show real hasActivity indicators on DayPill",
+            "description": "mockHasActivity is hardcoded to false. Should reflect real Firestore data to show which days had workouts.",
+            "priority": "high"
+        },
+        {
+            "id": "F-2",
+            "module": "SetGraphScreen",
+            "task": "Per-exercise Chart selector",
+            "description": "Currently shows only the exercise with the most data points. Add a dropdown or horizontal scroll to let users pick which exercise to visualize.",
+            "priority": "medium"
+        },
+        {
+            "id": "F-3",
+            "module": "ExerciseDetailScreen",
+            "task": "Audit and review",
+            "description": "File not reviewed yet. Check for bugs, memory leaks, and state management issues.",
+            "priority": "high"
+        },
+        {
+            "id": "F-4",
+            "module": "Today Screen",
+            "task": "mainNavController usage audit",
+            "description": "mainNavController is passed but not visibly used. Either use it or remove it.",
+            "priority": "low"
+        },
+        {
+            "id": "F-5",
+            "module": "AccountScreen",
+            "task": "Replace R.drawable.male_choose default profile image",
+            "description": "Default profile image is a gym photo. Replace with a neutral Icon (AccountCircle) or gender-aware placeholder.",
+            "priority": "medium"
+        },
+        {
+            "id": "F-6",
+            "module": "GenderSelectionScreen",
+            "task": "Diagonal split with gradient instead of images",
+            "description": "ShredzillaBackground composable built but not yet applied to GenderSelectionScreen triangle splits.",
+            "priority": "medium"
+        },
+        {
+            "id": "F-7",
+            "module": "Onboarding Screens",
+            "task": "Apply ShredzillaBackground to all onboarding screens",
+            "description": "ShredzillaBackground was designed but needs to be verified applied correctly on all 5 onboarding screens.",
+            "priority": "medium"
+        },
+        {
+            "id": "F-8",
+            "module": "Auth Screens",
+            "task": "Replace login_background and register_background with gradient",
+            "description": "Login and Register screens still use image backgrounds. Consider replacing with ShredzillaBackground for consistency and smaller APK.",
+            "priority": "low"
+        }
+    ],
+    "bugs_to_fix": [
+        {
+            "id": "B-1",
+            "module": "UserDataManager",
+            "task": "Fix todayDateStr reference in loadSetsForDate error log",
+            "description": "Log.w references todayDateStr which is undefined. Should be selectedDateStr.",
+            "priority": "low",
+            "file": "UserDataManager.kt",
+            "line": "Log.w(\"Firestore\", \"Today's sets listen failed for $userId on $todayDateStr.\", e)"
+        },
+        {
+            "id": "B-2",
+            "module": "MainViewModel",
+            "task": "Add cache expiry to loadHistoricalAnalytics",
+            "description": "Analytics are cached forever in the session. Should expire after 30 minutes to reflect new workouts.",
+            "priority": "medium"
+        },
+        {
+            "id": "B-3",
+            "module": "ExercisesScreen",
+            "task": "Replace SortOption.values() with SortOption.entries",
+            "description": "values() is deprecated in Kotlin. Use entries instead.",
+            "priority": "low"
+        },
+        {
+            "id": "B-4",
+            "module": "AppRoutes",
+            "task": "Remove unused SETS constant",
+            "description": "AppRoutes.SETS is defined but never used. BottomNavItem.Sets.route is the actual route.",
+            "priority": "low"
+        }
+    ],
+    "code_quality": [
+        {
+            "id": "Q-1",
+            "module": "All screens",
+            "task": "Final unused imports sweep before public release",
+            "description": "Run ./gradlew assembleDebug and verify zero warnings from unused imports.",
+            "priority": "high"
+        },
+        {
+            "id": "Q-2",
+            "module": "MainAppContainer",
+            "task": "Move Firestore list operations to UserDataManager",
+            "description": "CREATE_NEW_LIST and EDIT_LIST_SCREEN still call db.collection() directly. Should use a helper in UserDataManager.",
+            "priority": "medium"
+        },
+        {
+            "id": "Q-3",
+            "module": "MainViewModel",
+            "task": "Move login/onboarding check logic into ViewModel",
+            "description": "checkOnboardingAndSetDestination is in MainActivity. Architecturally it belongs in MainViewModel.",
+            "priority": "medium"
+        }
+    ],
+    "release_checklist": [
+        "Run ./gradlew assembleRelease successfully",
+        "Test on physical device (not emulator)",
+        "Verify google-services.json is NOT in git",
+        "Verify gradle.properties signing keys are NOT in git",
+        "Update versionCode and versionName in build.gradle.kts",
+        "Test offline mode (Airplane Mode) for set logging",
+        "Test screen rotation on Today, Sets, and Exercises screens",
+        "Test app open after Process Death",
+        "Verify App Open Ad shows correctly after splash",
+        "Test Google Sign-In and Email Sign-In flows",
+        "Test account deletion flow",
+        "Make GitHub repo Public"
+    ]
+}

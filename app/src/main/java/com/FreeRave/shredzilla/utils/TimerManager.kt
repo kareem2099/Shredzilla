@@ -46,15 +46,24 @@ class TimerManager(
         isTimerRunning = true
         NotificationUtils.showTimerRunningNotification(context, timerRemainingSeconds, timerTotalSeconds)
 
+        val targetEndTimeMillis = System.currentTimeMillis() + (duration * 1000L)
+
         timerJob = coroutineScope.launch {
-            while (timerRemainingSeconds > 0 && isTimerRunning) {
-                delay(1000L)
-                if (isTimerRunning) { // Check again in case it was stopped externally
-                    timerRemainingSeconds--
-                    NotificationUtils.showTimerRunningNotification(context, timerRemainingSeconds, timerTotalSeconds)
+            while (isTimerRunning) {
+                val currentMillis = System.currentTimeMillis()
+                if (currentMillis >= targetEndTimeMillis) {
+                    timerRemainingSeconds = 0
+                    break // Loop halts precisely on time
                 }
+
+                // Mathematical delta logic guarantees we never drift out of sync due to Coroutine pauses
+                timerRemainingSeconds = ((targetEndTimeMillis - currentMillis) / 1000L).toInt()
+                NotificationUtils.showTimerRunningNotification(context, timerRemainingSeconds, timerTotalSeconds)
+
+                delay(100L) // Quick ticks, but the evaluation remains anchored to currentTimeMillis
             }
-            if (isTimerRunning) { // If timer completed naturally
+
+            if (isTimerRunning && timerRemainingSeconds <= 0) { // If timer completed naturally without user interruption
                 isTimerRunning = false
                 NotificationUtils.cancelTimerRunningNotification(context)
                 NotificationUtils.showTimerFinishedNotification(context)

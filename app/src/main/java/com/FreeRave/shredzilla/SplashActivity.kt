@@ -43,14 +43,14 @@ fun SplashScreen(onTimeout: () -> Unit) {
         LottieCompositionSpec.RawRes(R.raw.splash_screen)
     )
 
-    // ✅ iterations = 1 عشان تشتغل مرة واحدة بس وتوقف
+    // iterations = 1 so it plays exactly once and halts
     val progress by animateLottieCompositionAsState(
         composition = composition,
         iterations = 1,
         isPlaying = true
     )
 
-    // ✅ بننتقل لما الأنيميشن تخلص فعلاً — مش بعد delay ثابت
+    // Transition precisely when the animation completes natively, rather than a fixed delay
     LaunchedEffect(progress) {
         if (progress == 1f) {
             onTimeout()

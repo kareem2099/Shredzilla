@@ -54,10 +54,10 @@ object NotificationUtils {
             .setContentTitle("Rest Timer Active")
             .setContentText("Next set in: $timeFormatted")
             .setPriority(NotificationCompat.PRIORITY_LOW) // Lower priority for ongoing
-            .setOngoing(true) // Makes the notification non-dismissable by swipe
             .setOnlyAlertOnce(true) // Important for progress updates
             .setProgress(totalSeconds, totalSeconds - remainingSeconds, false)
             .setContentIntent(pendingIntent) // Open app on tap
+            .setAutoCancel(true)
 
         try {
             NotificationManagerCompat.from(context).notify(TIMER_RUNNING_NOTIFICATION_ID, builder.build())

@@ -5,30 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2026-03-21
+---
+
+## [Unreleased] — v1.3.0
+
+### Planned
+- Real workout activity indicators on `DayPill` strip
+- Per-exercise selector for the progress chart
+- LazyColumn pagination for large exercise lists
+- Screen transition animations
+- `SavedStateHandle` persistence for analytics graph data
+
+---
+
+## [1.2.0] — 2026-03-22
 
 ### Added
-- **Multi-step Onboarding Flow:** Beautiful Jetpack Compose screens for new users to set `Gender`, and physical details (`Height`, `Weight`, `Experience Level`).
-- **State Hoisted Architecture:** Dedicated `MainViewModel` engines to govern critical user mutations (`updateUsername`, `deleteUserAccount`) completely independent of the Compose UI lifecycle map.
-- **Dynamic Midnight Resolver:** Extracted the "Today's Sets" listener `snapshotListener` off of strict App Initialization static dates, converting it to a dynamic refreshable request via `setupTodaySetsListener(userId)`.
-- **Zombie File Sweeper:** Programmed an automatic garbage collection wipe using `ImageStorageUtils.deleteImageFromInternalStorage()` upon Profile Picture resets and outright Account Deletion routines.
-- **Conversion Engines:** Abstracted mathematically hardcoded calculations (`* 0.45359237`) into mathematically isolated helpers `convertToStorageWeight` (Lbs to Kg) and `convertToDisplayWeight` (Kg to Lbs).
+- **Offline-First Set Logging:** Implemented Optimistic UI updates — sets render instantly in the UI before the Firebase write completes. Firestore's native offline persistence queues the write and syncs silently upon reconnection.
+- **Zero-Drift Rest Timer:** Re-architected the countdown loop using delta math (`targetEndTime - System.currentTimeMillis()`). The timer is now anchored to wall-clock time rather than coroutine tick intervals, eliminating all drift from CPU load and background threading.
+- **Debounced Exercise Search:** Introduced a `MutableStateFlow` search query in `MainViewModel` with a 300ms `debounce` operator. Prevents keystroke latency and ANR risk during heavy list filtering.
+- **Date-Selectable Today Screen:** Users can now tap any day on the horizontal strip or open the full-screen calendar to view sets logged on any past date. `UserDataManager.loadSetsForDate()` dynamically swaps the active Firestore listener.
+- **Historical Analytics Engine:** `loadHistoricalAnalytics()` fetches up to 90 days of `dailyActivity` data, aggregates total volume per exercise per day on `Dispatchers.Default`, and caches the result in-session to prevent redundant reads.
+- **Dynamic Progress Chart:** `ProgressChartCanvas` draws a gradient-filled line chart with dynamic Y-axis clamping. Handles edge cases including single data points, all-equal values, and zero-range division safely.
 
 ### Changed
-- Refactored `FitnessActivity.kt` entirely out of the repository structure; unified navigation behind a purely composable `MainAppContainer`.
-- Replaced vulnerable generic `remember { mutableStateOf() }` text bindings in `UpdateUsernameScreen` with `rememberSaveable` to actively preserve typing strings amidst Device Orientations.
-- Re-architected Account Deletion procedures with immutable ViewModel-based process indicators (`isDeletingAccount`).
-- Unified repetitive single-line Firestore document updates behind a versatile generic handler `updateUserSetting(userId, key, value)`.
-- Replaced monolithic single-file authentications with separated robust abstractions: `FirebaseEmailPasswordAuth` and `FirebaseGoogleAuth`.
+- `MainViewModel` now owns both `TimerManager` and `UserDataManager`, anchoring their lifecycle to `viewModelScope`. Both survive screen rotation and background interruptions without state loss.
+- `startDestination` navigation state migrated from a plain `mutableStateOf` in `MainActivity` to a `SavedStateHandle`-backed `StateFlow` in `MainViewModel`. Navigation destination now survives OS-level Process Death.
+- `UserDataManager.setupFirestoreListeners()` now stores all `ListenerRegistration` handles in a managed list. `clearAllListeners()` removes them atomically on logout or account deletion.
+- All onboarding Firestore writes consolidated behind `FirebaseEmailPasswordAuth.updateUserOnboardingData()`, replacing scattered direct `db.collection()` calls throughout the navigation graph.
+- All settings Firestore writes consolidated behind `UserDataManager.updateUserSetting(userId, key, value)`, eliminating repetitive boilerplate across Unit, Theme, Reminder, and Rest Time settings screens.
+- `AppNavigationHost` migrated from `activityContext.lifecycleScope` to `mainViewModel.viewModelScope` for all coroutine launches, preventing silent cancellation during configuration changes.
 
 ### Fixed
-- **Massive Memory Leaks:** Identified and cured eternal background snapshot observer bindings. Instantiated a strict `ListenerRegistration` cache within `UserDataManager` executing a systematic `.remove()` iteration triggered immediately on Account Logout.
-- Repaired compilation syntax parameter mismatches concerning implicit `androidx.lifecycle.viewModelScope` bindings across the isolated navigation routers.
-- Engine corrected Firebase singleton reference aliases (`FirebaseFirestore.getInstance()`) preventing arbitrary compiler failure on network dispatch.
+- **Stuck Notification Bug:** Timer running notification persisted after app restart if the process was killed while the timer was active. `NotificationUtils.cancelTimerRunningNotification()` is now called on `MainActivity.onCreate()` to clear any orphaned notifications on fresh launch.
+- **SetGraphScreen invisible content:** Inner `LazyColumn` had no `weight(1f)` modifier, causing it to render with zero measured height inside a `fillMaxSize` Column.
+- **Double `MobileAds` initialization:** Removed redundant `MobileAds.initialize()` call from `MainActivity`. Initialization is handled exclusively in `MyApplication`.
+- **App Open Ad frequency:** Removed `showAdIfAvailable()` call from `onActivityResumed`. Ads now trigger exclusively from `ProcessLifecycleOwner.onStart()`, preventing ads from showing after permission dialogs and external intents.
+- Resolved `Unresolved reference: viewModelScope` compilation errors in `AppNavigationHost` and `MainAppContainer` by adding the missing `androidx.lifecycle.viewModelScope` import.
+- Resolved `Unresolved reference: firestore` in `MainViewModel.deleteUserAccount()` by replacing the incorrect fully-qualified alias with a proper `Firebase.firestore` instance.
 
-## [1.0.0] - Initial Release
+---
+
+## [1.1.0] — 2026-03-21
 
 ### Added
-- Minimum Viable Product (MVP) core logic.
-- Initial Android App Framework utilizing Kotlin and modern Jetpack Compose.
-- Basic Exercise sets tracking mechanisms and authentication prototypes.
+- **Multi-step Onboarding Flow:** New user screens for `Gender`, `Physical Details` (height, weight, age), `Rest Time Preference`, `Initial Exercises`, and `Weekly Goal`, each saving incrementally to Firestore with `SetOptions.merge()`.
+- **MainViewModel Architecture:** Dedicated ViewModel to govern critical user mutations (`updateUsername`, `deleteUserAccount`) using `viewModelScope`, completely independent of the Compose UI lifecycle.
+- **Dynamic Date Resolver:** `UserDataManager.loadSetsForDate()` replaces the static date initialization, enabling dynamic listener swapping for any calendar date.
+- **Zombie File Sweeper:** Automatic local image cleanup via `ImageStorageUtils.deleteImageFromInternalStorage()` triggered on profile picture replacement and account deletion.
+- **Weight Conversion Helpers:** `convertToStorageWeight()` and `convertToDisplayWeight()` centralize unit conversion logic, ensuring all weights are stored in kg regardless of user display preference.
+- **Atomic User Registration:** Firestore write failure during `createUser()` now triggers `firebaseUser.delete().await()` to roll back the Firebase Auth record, preventing zombie accounts.
+- **Google Auth Collision Handling:** `FirebaseAuthUserCollisionException` is caught and surfaced with a clear message directing users to log in with their existing password.
+
+### Changed
+- Removed `FitnessActivity.kt` entirely. Navigation unified behind a composable `MainAppContainer` with a Jetpack Navigation `NavHost`.
+- `UpdateUsernameScreen` text fields migrated from `remember` to `rememberSaveable` to preserve input across device rotations.
+- `AccountScreen.isDeletingAccount` extracted from local Composable state into a ViewModel-backed `mutableStateOf`, preventing the loading indicator from disappearing on rotation.
+- Replaced repetitive Firestore update calls across settings screens with the centralized `updateUserSetting(userId, key, value)` helper.
+- Separated authentication logic into `FirebaseEmailPasswordAuth` and `FirebaseGoogleAuth` for single-responsibility and testability.
+
+### Fixed
+- **Memory Leaks:** Firestore snapshot listeners were never removed on logout. Introduced a `ListenerRegistration` list with systematic `.remove()` calls via `clearAllListeners()`.
+- Fixed `viewModelScope` import errors causing compilation failures in navigation router files.
+- Fixed `FirebaseFirestore.getInstance()` reference errors in `MainViewModel` by using the correct `Firebase.firestore` KTX extension.
+
+---
+
+## [1.0.0] — Initial Release
+
+### Added
+- Minimum Viable Product (MVP) core logic
+- Android app framework using Kotlin and Jetpack Compose
+- Basic exercise set tracking and Firebase Authentication prototype

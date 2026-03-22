@@ -17,11 +17,8 @@ import com.FreeRave.shredzilla.viewmodels.MainViewModel
 import com.FreeRave.shredzilla.auth.FirebaseEmailPasswordAuth
 import com.FreeRave.shredzilla.auth.FirebaseGoogleAuth
 import com.FreeRave.shredzilla.composables.AppBottomNavigationBar
-import com.FreeRave.shredzilla.data.UserDataManager
 import com.FreeRave.shredzilla.models.ExerciseItem // Keep for CreateNewListScreen mapping
 import com.FreeRave.shredzilla.models.ExerciseDisplayInfo
-import com.FreeRave.shredzilla.models.UserExerciseList
-import com.FreeRave.shredzilla.models.RecordedSet
 import com.FreeRave.shredzilla.screens.account.AccountScreen
 import com.FreeRave.shredzilla.screens.account.UpdateUsernameScreen
 import com.FreeRave.shredzilla.screens.exercises.AddExerciseScreen
@@ -34,17 +31,13 @@ import com.FreeRave.shredzilla.screens.sets.ExerciseListDetailScreen
 import com.FreeRave.shredzilla.screens.sets.SetGraphScreen
 import com.FreeRave.shredzilla.screens.today.TodayScreen
 import com.FreeRave.shredzilla.ui.theme.ThemeManager
-import com.FreeRave.shredzilla.utils.TimerManager
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -79,9 +72,19 @@ fun MainAppContainer(
         userDataManager.setupFirestoreListeners(currentUser)
     }
 
-    val exerciseDisplayList by remember {
+    val searchQuery by mainViewModel.searchQuery.collectAsState()
+    val debouncedSearchQuery by mainViewModel.debouncedSearchQuery.collectAsState()
+
+    val exerciseDisplayList by remember(debouncedSearchQuery) {
         derivedStateOf {
-            userDataManager.masterExerciseList.map { exerciseName ->
+            val query = debouncedSearchQuery.trim()
+            val filteredList = if (query.isEmpty()) {
+                userDataManager.masterExerciseList
+            } else {
+                userDataManager.masterExerciseList.filter { it.contains(query, ignoreCase = true) }
+            }
+
+            filteredList.map { exerciseName ->
                 val exerciseId = exerciseName.lowercase().replace(" ", "_")
                 ExerciseDisplayInfo(
                     id = exerciseId,
@@ -115,17 +118,31 @@ fun MainAppContainer(
                 TodayScreen(
                     Modifier.fillMaxSize(),
                     mainNavController,
-                    firebaseEmailAuthManager,
-                    firebaseGoogleAuthManager,
                     userDataManager.todayTotalReps,
                     userDataManager.todayTotalSets,
                     userDataManager.todayUniqueExercises,
                     userDataManager.todayRecordedSetsList,
-                    userDataManager.userUnitSystem
+                    userDataManager.userUnitSystem,
+                    onDateSelected = { selectedDate ->
+                        currentUser?.uid?.let { uid ->
+                            userDataManager.loadSetsForDate(uid, selectedDate)
+                        }
+                    }
                 )
             }
             composable(BottomNavItem.Sets.route) {
+                val analyticsData by mainViewModel.analyticsGraphData.collectAsState()
+                val isAnalyticsLoading by mainViewModel.isAnalyticsLoading.collectAsState()
+
+                LaunchedEffect(currentUser?.uid) {
+                    currentUser?.uid?.let { uid ->
+                        mainViewModel.loadHistoricalAnalytics(uid)
+                    }
+                }
+
                 SetGraphScreen(
+                    analyticsGraphData = analyticsData,
+                    isAnalyticsLoading = isAnalyticsLoading,
                     exerciseCount = userDataManager.masterExerciseList.size,
                     userExerciseLists = userDataManager.userExerciseLists,
                     onNavigateToSettings = { bottomBarNavController.navigate(AppRoutes.SETTINGS) },
@@ -147,6 +164,8 @@ fun MainAppContainer(
             composable(AppRoutes.EXERCISE_LIST_SCREEN) {
                 ExercisesScreen(
                     exercisesDisplayInfo = exerciseDisplayList,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { mainViewModel.updateSearchQuery(it) },
                     onNavigateToAddExercise = { bottomBarNavController.navigate(AppRoutes.ADD_EXERCISE) },
                     onNavigateBack = { bottomBarNavController.popBackStack() },
                     onDeleteExercise = { exerciseName -> userDataManager.deleteExerciseFromFirestore(exerciseName) },
