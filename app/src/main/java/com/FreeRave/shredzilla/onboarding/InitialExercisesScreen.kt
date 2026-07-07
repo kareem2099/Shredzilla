@@ -1,10 +1,14 @@
 package com.FreeRave.shredzilla.onboarding
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items // Correct import for LazyColumn items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
@@ -14,24 +18,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.FreeRave.shredzilla.R
-import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
-import com.FreeRave.shredzilla.ui.theme.ThemeManager
-import com.FreeRave.shredzilla.models.ExerciseItem // Import from models
-import com.FreeRave.shredzilla.models.initialGlobalExerciseList // Import from models
-
-// ExerciseItem data class and initialExerciseList are now in models.ExerciseModels.kt
+import androidx.compose.ui.unit.sp
+import com.FreeRave.shredzilla.ui.theme.*
+import com.FreeRave.shredzilla.models.ExerciseItem
+import com.FreeRave.shredzilla.models.initialGlobalExerciseList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InitialExercisesScreen(onExercisesSelected: (List<String>) -> Unit) {
-    // Create a mutable list of ExerciseItem with selection state for this screen
     val exerciseScreenItems = remember {
         mutableStateListOf(
             *initialGlobalExerciseList.map { model ->
@@ -43,83 +45,123 @@ fun InitialExercisesScreen(onExercisesSelected: (List<String>) -> Unit) {
                     targetMuscles = model.targetMuscles,
                     equipmentNeeded = model.equipmentNeeded,
                     difficulty = model.difficulty,
-                    isSelected = true // Default to selected for this screen
+                    isSelected = true // Default to selected
                 )
             }.toTypedArray()
         )
     }
 
-    val gender = ThemeManager.currentGenderTheme
-    val backgroundImageRes = if (gender == "Female") {
-        R.drawable.forth_page_female
-    } else {
-        R.drawable.forth_page_male
-    }
+    // Button scale animation
+    var btnPressed by remember { mutableStateOf(false) }
+    val btnScale by animateFloatAsState(
+        targetValue = if (btnPressed) 0.97f else 1f,
+        animationSpec = tween(120),
+        label = "btnScale"
+    )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = backgroundImageRes),
-            contentDescription = "Background",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+    // Button gradient & accent
+    val btnGradient = Brush.horizontalGradient(
+        listOf(AuthBtnGradientStart, AuthBtnGradientEnd)
+    )
+    val screenAccent = AuthBtnGradientEnd
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(AuthBgTop, AuthBgBottom)))
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(horizontal = 28.dp, vertical = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
-            Icon(
-                imageVector = Icons.Filled.Checklist,
-                contentDescription = "Set Initial Exercises Icon",
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
             Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Glowing Icon ───────────────────────────────────────────────────
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(90.dp)
+                    .clip(CircleShape)
+                    .background(Purple40.copy(alpha = 0.22f))
+                    .border(1.dp, screenAccent.copy(alpha = 0.35f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Checklist,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             Text(
                 text = "Set Initial Exercises",
-                style = MaterialTheme.typography.headlineSmall,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface // Ensure text is readable
+                color = Color.White
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Select exercises you plan on doing.\nYou will add more later",
+                text = "Select exercises you plan on doing.\nYou can easily add more later.",
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant // Ensure readability
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.60f)
             )
-            Spacer(modifier = Modifier.height(24.dp))
 
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(exerciseScreenItems) { exercise -> // Use the local mutable state list
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Exercise Selection List ────────────────────────────────────────
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(exerciseScreenItems) { exercise ->
                     ExerciseSelectionCard(
-                        exercise = exercise, // This is now the local ExerciseItem with isSelected state
+                        exercise = exercise,
+                        accentColor = screenAccent,
                         onExerciseSelected = {
                             val index = exerciseScreenItems.indexOf(exercise)
                             if (index != -1) {
-                                exerciseScreenItems[index] = exerciseScreenItems[index].copy(isSelected = !exerciseScreenItems[index].isSelected)
+                                exerciseScreenItems[index] = exerciseScreenItems[index].copy(
+                                    isSelected = !exerciseScreenItems[index].isSelected
+                                )
                             }
                         }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
-                onClick = {
-                    val selectedIds = exerciseScreenItems.filter { it.isSelected }.map { it.id }
-                    onExercisesSelected(selectedIds)
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp)
+            // ── Next Button ───────────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .scale(btnScale)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(btnGradient)
             ) {
-                Text("Next")
+                Button(
+                    onClick = {
+                        val selectedIds = exerciseScreenItems.filter { it.isSelected }.map { it.id }
+                        onExercisesSelected(selectedIds)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    elevation = null
+                ) {
+                    Text(
+                        text = "Next →",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -127,76 +169,56 @@ fun InitialExercisesScreen(onExercisesSelected: (List<String>) -> Unit) {
 @Composable
 fun ExerciseSelectionCard(
     exercise: ExerciseItem,
+    accentColor: Color,
     onExerciseSelected: () -> Unit
 ) {
+    val cardBgColor = if (exercise.isSelected) {
+        accentColor.copy(alpha = 0.12f)
+    } else {
+        Color.White.copy(alpha = 0.05f)
+    }
+
+    val cardBorderColor = if (exercise.isSelected) {
+        accentColor.copy(alpha = 0.45f)
+    } else {
+        Color.White.copy(alpha = 0.10f)
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(1.dp, cardBorderColor, RoundedCornerShape(14.dp))
             .clickable(onClick = onExerciseSelected),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        )
+        colors = CardDefaults.cardColors(containerColor = cardBgColor)
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .padding(horizontal = 20.dp, vertical = 18.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = if (exercise.isSelected) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
                 contentDescription = if (exercise.isSelected) "Selected" else "Not selected",
-                tint = if (exercise.isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (exercise.isSelected) accentColor else Color.White.copy(alpha = 0.45f),
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = exercise.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White
             )
         }
     }
 }
 
-
-@Preview(showBackground = true, name = "Initial Exercises Light Male")
+@Preview(showBackground = true)
 @Composable
-fun InitialExercisesScreenMaleLightPreview() {
-    ThemeManager.currentGenderTheme = "Male"
-    // ThemeManager.themePreferenceMale = ThemeSetting.LIGHT // To force light for this preview
+fun InitialExercisesScreenPreview() {
     ShredzillaTheme {
-        Surface { InitialExercisesScreen {} }
-    }
-}
-
-@Preview(showBackground = true, name = "Initial Exercises Dark Male")
-@Composable
-fun InitialExercisesScreenMaleDarkPreview() {
-    ThemeManager.currentGenderTheme = "Male"
-    // ThemeManager.themePreferenceMale = ThemeSetting.DARK // To force dark for this preview
-    ShredzillaTheme {
-        Surface { InitialExercisesScreen {} }
-    }
-}
-
-@Preview(showBackground = true, name = "Initial Exercises Light Female")
-@Composable
-fun InitialExercisesScreenFemaleLightPreview() {
-    ThemeManager.currentGenderTheme = "Female"
-    // ThemeManager.themePreferenceFemale = ThemeSetting.LIGHT // To force light for this preview
-    ShredzillaTheme {
-        Surface { InitialExercisesScreen {} }
-    }
-}
-
-@Preview(showBackground = true, name = "Initial Exercises Dark Female")
-@Composable
-fun InitialExercisesScreenFemaleDarkPreview() {
-    ThemeManager.currentGenderTheme = "Female"
-    // ThemeManager.themePreferenceFemale = ThemeSetting.DARK // To force dark for this preview
-    ShredzillaTheme {
-        Surface { InitialExercisesScreen {} }
+        InitialExercisesScreen {}
     }
 }

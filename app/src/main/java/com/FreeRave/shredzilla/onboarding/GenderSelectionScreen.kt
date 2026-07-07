@@ -1,195 +1,305 @@
 package com.FreeRave.shredzilla.onboarding
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Female
+import androidx.compose.material.icons.filled.Male
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip // Re-add clip
-// Removed: import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Shape // Re-add Shape
-import androidx.compose.ui.graphics.Outline // Re-add Outline
-import androidx.compose.ui.graphics.Path // Re-add Path
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity // Re-add LocalDensity
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Density // Re-add Density
-import androidx.compose.ui.unit.LayoutDirection // Re-add LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.FreeRave.shredzilla.R
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
-// Removed direct imports of DarkText and DarkAccentPink
 
-// Custom Shape for Top-Left Triangle (for Female)
-class TopLeftTriangleShape : Shape {
-    override fun createOutline(
-        size: androidx.compose.ui.geometry.Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val path = Path().apply {
-            moveTo(0f, 0f)
-            lineTo(size.width, 0f)
-            lineTo(0f, size.height)
-            close()
-        }
-        return Outline.Generic(path)
-    }
-}
+// ── Gender card brand colours ────────────────────────────────────────────────
+// Female: rose → magenta diagonal half
+private val FemBgTop     = Color(0xFF3B0A2A)
+private val FemBgBottom  = Color(0xFF7B1458)
+private val FemAccent    = Color(0xFFFF80AB)
 
-// Custom Shape for Bottom-Right Triangle (for Male)
-class BottomRightTriangleShape : Shape {
-    override fun createOutline(
-        size: androidx.compose.ui.geometry.Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val path = Path().apply {
-            moveTo(size.width, 0f) // Start at top-right
-            lineTo(size.width, size.height) // Go to bottom-right
-            lineTo(0f, size.height) // Go to bottom-left
-            close() // This creates a bottom-right triangle if the implicit start is top-right,
-                     // but to be explicit for a \ split:
-                     // moveTo(width, 0) -> lineTo(width, height) -> lineTo(0, height) -> close() is bottom right
-                     // For a \ split, Male is bottom-right, Female is top-left.
-                     // Male: (0, height) -> (width, height) -> (width, 0) -> close()
-                     // Female: (0,0) -> (width,0) -> (0, height) -> close()
-        }
-        // Corrected BottomRightTriangleShape for a '\' split
-        val correctedPath = Path().apply {
-            moveTo(0f, size.height) // Bottom-left
-            lineTo(size.width, size.height) // Bottom-right
-            lineTo(size.width, 0f) // Top-right
-            close()
-        }
-        return Outline.Generic(correctedPath)
-    }
-}
-
+// Male: deep-teal → green diagonal half
+private val MaleBgTop    = Color(0xFF00210F)
+private val MaleBgBottom = Color(0xFF006D3D)
+private val MaleAccent   = Color(0xFF50D892)
 
 @Composable
 fun GenderSelectionScreen(onGenderSelected: (String) -> Unit) {
-    var selectedGender by remember { mutableStateOf<String?>(null) }
-    var showImagePopup by remember { mutableStateOf(false) }
+    var selectedGender    by remember { mutableStateOf<String?>(null) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    // Pressed-scale animations
+    var femalePressed by remember { mutableStateOf(false) }
+    var malePressed   by remember { mutableStateOf(false) }
+    val femaleScale by animateFloatAsState(
+        targetValue    = if (femalePressed) 0.97f else 1f,
+        animationSpec  = tween(120),
+        label          = "femaleScale"
+    )
+    val maleScale by animateFloatAsState(
+        targetValue    = if (malePressed) 0.97f else 1f,
+        animationSpec  = tween(120),
+        label          = "maleScale"
+    )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Female Section (Top-Left Triangle)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(TopLeftTriangleShape()) // Female uses TopLeftTriangleShape
-                .clickable {
-                    selectedGender = "Female"
-                    showImagePopup = true
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.female_choose),
-                contentDescription = "Female Background",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+
+        // ── Full-screen Canvas: two gradient triangles + dashed divider ───────
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+
+            // Female triangle — top-left
+            val femalePath = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(w, 0f)
+                lineTo(0f, h)
+                close()
+            }
+            drawPath(
+                path  = femalePath,
+                brush = Brush.linearGradient(
+                    colors = listOf(FemBgTop, FemBgBottom),
+                    start  = Offset(0f, 0f),
+                    end    = Offset(w * 0.5f, h)
+                )
             )
-            Text(
-                "FEMALE",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary, // Changed to onPrimaryContainer for better contrast on image potentially
-                modifier = Modifier
-                    .align(Alignment.TopStart) // Align to TopStart
-                    .padding(start = 32.dp, top = 32.dp) // Add some padding from the edges
+
+            // Male triangle — bottom-right
+            val malePath = Path().apply {
+                moveTo(w, 0f)
+                lineTo(w, h)
+                lineTo(0f, h)
+                close()
+            }
+            drawPath(
+                path  = malePath,
+                brush = Brush.linearGradient(
+                    colors = listOf(MaleBgTop, MaleBgBottom),
+                    start  = Offset(w * 0.5f, 0f),
+                    end    = Offset(w, h)
+                )
+            )
+
+            // Dashed diagonal divider
+            drawLine(
+                color       = Color.White.copy(alpha = 0.20f),
+                start       = Offset(w, 0f),
+                end         = Offset(0f, h),
+                strokeWidth = 2.dp.toPx(),
+                pathEffect  = PathEffect.dashPathEffect(floatArrayOf(18f, 10f), 0f)
             )
         }
 
-        // Male Section (Bottom-Right Triangle)
+        // ── Female tap zone (top-left triangle) ───────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(BottomRightTriangleShape()) // Male uses BottomRightTriangleShape
-                .clickable {
-                    selectedGender = "Male"
-                    showImagePopup = true
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.male_choose),
-                contentDescription = "Male Background",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            Text(
-                "MALE",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary, // Changed to onPrimaryContainer for better contrast
-                modifier = Modifier
-                    .align(Alignment.BottomEnd) // Align to BottomEnd
-                    .padding(end = 32.dp, bottom = 32.dp) // Add some padding from the edges
-            )
-        }
-        // No explicit diagonal line needed, the clipped shapes form the boundary.
-
-        if (showImagePopup && selectedGender != null) {
-            AlertDialog(
-                shape = MaterialTheme.shapes.medium, // Added shape parameter
-                onDismissRequest = {
-                    showImagePopup = false
-                    selectedGender = null
-                },
-                title = { Text(text = "$selectedGender Selected") },
-                text = { Text("You've selected $selectedGender. Continue?") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showImagePopup = false
-                            onGenderSelected(selectedGender!!)
-                            selectedGender = null
+                .scale(femaleScale)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            femalePressed = true
+                            tryAwaitRelease()
+                            femalePressed = false
                         },
-                        modifier = Modifier.padding(start = 4.dp) // Add padding to push it slightly from center/other button
-                    ) { Text("Yes, Continue") }
-                },
-                dismissButton = {
-                    Button(
-                        onClick = {
-                            showImagePopup = false
-                            selectedGender = null
-                        },
-                        modifier = Modifier.padding(end = 4.dp) // Add padding to push it slightly from center/other button
-                    ) { Text("Cancel") }
+                        onTap = { offset ->
+                            if (offset.x / size.width + offset.y / size.height <= 1f) {
+                                selectedGender    = "Female"
+                                showConfirmDialog = true
+                            }
+                        }
+                    )
                 }
-            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 44.dp, top = 72.dp),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Glowing circle icon
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier         = Modifier.size(72.dp).clip(CircleShape)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(FemAccent.copy(alpha = 0.35f), Color.Transparent)
+                            )
+                        )
+                        drawCircle(
+                            color  = FemAccent.copy(alpha = 0.30f),
+                            radius = size.minDimension / 2f,
+                            style  = Stroke(width = 1.5.dp.toPx())
+                        )
+                    }
+                    Icon(
+                        imageVector        = Icons.Filled.Female,
+                        contentDescription = "Female",
+                        tint               = FemAccent,
+                        modifier           = Modifier.size(40.dp)
+                    )
+                }
+                Text(
+                    text          = "FEMALE",
+                    fontSize      = 28.sp,
+                    fontWeight    = FontWeight.Black,
+                    letterSpacing = 3.sp,
+                    color         = Color.White
+                )
+                Text(
+                    text     = "For be cutie \uD83D\uDC95",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color    = FemAccent.copy(alpha = 0.80f)
+                )
+                Text(
+                    text     = "Tap to select",
+                    fontSize = 12.sp,
+                    color    = Color.White.copy(alpha = 0.40f)
+                )
+            }
         }
+
+        // ── Male tap zone (bottom-right triangle) ─────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .scale(maleScale)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            malePressed = true
+                            tryAwaitRelease()
+                            malePressed = false
+                        },
+                        onTap = { offset ->
+                            if (offset.x / size.width + offset.y / size.height >= 1f) {
+                                selectedGender    = "Male"
+                                showConfirmDialog = true
+                            }
+                        }
+                    )
+                }
+        ) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 44.dp, bottom = 80.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text     = "Tap to select",
+                    fontSize = 12.sp,
+                    color    = Color.White.copy(alpha = 0.40f)
+                )
+                Text(
+                    text       = "For be beast \uD83D\uDCAA",
+                    fontSize   = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color      = MaleAccent.copy(alpha = 0.80f)
+                )
+                Text(
+                    text          = "MALE",
+                    fontSize      = 28.sp,
+                    fontWeight    = FontWeight.Black,
+                    letterSpacing = 3.sp,
+                    color         = Color.White
+                )
+                // Glowing circle icon
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier         = Modifier.size(72.dp).clip(CircleShape)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(MaleAccent.copy(alpha = 0.35f), Color.Transparent)
+                            )
+                        )
+                        drawCircle(
+                            color  = MaleAccent.copy(alpha = 0.30f),
+                            radius = size.minDimension / 2f,
+                            style  = Stroke(width = 1.5.dp.toPx())
+                        )
+                    }
+                    Icon(
+                        imageVector        = Icons.Filled.Male,
+                        contentDescription = "Male",
+                        tint               = MaleAccent,
+                        modifier           = Modifier.size(40.dp)
+                    )
+                }
+            }
+        }
+
+        // ── Centre label ──────────────────────────────────────────────────────
+        Text(
+            text       = "Who are you?",
+            fontSize   = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color      = Color.White.copy(alpha = 0.65f),
+            modifier   = Modifier.align(Alignment.Center)
+        )
+    }
+
+    // ── Confirmation dialog ───────────────────────────────────────────────────
+    if (showConfirmDialog && selectedGender != null) {
+        val accent = if (selectedGender == "Female") FemAccent else MaleAccent
+        AlertDialog(
+            onDismissRequest = {
+                showConfirmDialog = false
+                selectedGender   = null
+            },
+            title = {
+                Text(
+                    text       = "${selectedGender!!} Selected",
+                    fontWeight = FontWeight.Bold,
+                    color      = accent
+                )
+            },
+            text = { Text("You've selected ${selectedGender!!}. Continue?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val gender        = selectedGender!!
+                        showConfirmDialog = false
+                        selectedGender    = null
+                        onGenderSelected(gender)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = accent)
+                ) { Text("Yes, Continue", color = Color.Black) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showConfirmDialog = false
+                    selectedGender   = null
+                }) { Text("Cancel", color = accent) }
+            }
+        )
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Preview(showBackground = true)
 @Composable
-fun GenderSelectionScreenDarkPreview() {
-    // ThemeManager.currentGenderTheme = null // Or set to "Male" / "Female" to see specific gender colors
-    // ThemeManager.themePreferenceMale = ThemeSetting.DARK // Example to force dark for male
-    // ThemeManager.themePreferenceFemale = ThemeSetting.DARK // Example to force dark for female
-    ShredzillaTheme {
-        GenderSelectionScreen(onGenderSelected = {})
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFFFFFFFF)
-@Composable
-fun GenderSelectionScreenLightPreview() {
-    // ThemeManager.currentGenderTheme = null
-    // ThemeManager.themePreferenceMale = ThemeSetting.LIGHT // Example to force light for male
-    // ThemeManager.themePreferenceFemale = ThemeSetting.LIGHT // Example to force light for female
+private fun GenderSelectionPreview() {
     ShredzillaTheme {
         GenderSelectionScreen(onGenderSelected = {})
     }
