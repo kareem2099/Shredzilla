@@ -1,27 +1,26 @@
 [versions]
-agp = "9.1.0"
-kotlin = "2.3.20"
-coreKtx = "1.18.0"
+agp = "9.2.1"
+kotlin = "2.4.0"
+coreKtx = "1.19.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 appcompat = "1.7.1"
-material = "1.13.0"
+material = "1.14.0"
 activityCompose = "1.13.0"
-composeBom = "2026.03.00"
+composeBom = "2026.06.01"
 lottie = "6.7.1"
-navigationCompose = "2.9.7"
+navigationCompose = "2.9.8"
 materialIconsExtended = "1.7.8"
 firebaseAuth = "23.2.1"
 firebaseFirestore = "25.1.4"
 firebaseAnalytics = "22.5.0"
 firebaseMessaging = "24.1.2"
-googleServicesPlugin = "4.4.4"
-playServicesAuth = "21.5.1"
-playServicesAds = "25.1.0"
+googleServicesPlugin = "4.5.0"
+playServicesAuth = "21.6.0"
+playServicesAds = "25.4.0"
 appUpdater = "2.7"
-lifecycleProcess = "2.10.0"
-lifecycleProcessVersion = "2.10.0"
+lifecycleProcess = "2.11.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -50,11 +49,9 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 app-updater = { group = "com.github.javiersantos", name = "AppUpdater", version.ref = "appUpdater" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleProcess" }
-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleProcessVersion" }
 
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-#kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServicesPlugin" }

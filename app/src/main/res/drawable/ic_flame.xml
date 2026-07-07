@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Flame body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,8
+            C48,8 62,22 62,36
+            C62,40 60,43 57,45
+            C59,38 54,32 54,32
+            C54,32 56,44 48,52
+            C48,52 52,44 46,38
+            C46,38 48,50 40,56
+            C36,59 34,63 34,68
+            C34,78 40,86 48,88
+            C56,86 62,78 62,68
+            C62,60 58,54 58,54
+            C64,50 68,43 68,34
+            C68,20 56,10 48,8 Z" />
+
+    <!-- Inner flame highlight -->
+    <path
+        android:fillColor="#B388FF"
+        android:pathData="M48,38
+            C48,38 54,46 52,56
+            C50,62 48,65 48,68
+            C48,72 50,76 54,78
+            C56,74 56,68 54,64
+            C54,64 58,68 58,74
+            C60,70 60,64 58,58
+            C56,50 50,44 48,38 Z" />
+
+    <!-- Flame tip spark -->
+    <path
+        android:fillColor="#E8DEF8"
+        android:pathData="M48,16 C48,16 54,24 54,30 C51,27 48,16 48,16 Z" />
+
+</vector>

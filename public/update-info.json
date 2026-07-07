@@ -1,14 +1,15 @@
 {
-  "latestVersion": "1.2.0",
-  "latestVersionCode": 5,
-  "url": "https://apkpure.com/p/com.FreeRave.shredzilla",
+  "latestVersion": "1.3.0",
+  "latestVersionCode": 6,
+  "url": "https://play.google.com/store/apps/details?id=com.FreeRave.shredzilla",
   "releaseNotes": [
-    "Offline-First set logging — works perfectly in gym dead-zones.",
-    "Zero-drift rest timer — atomic precision regardless of CPU load.",
-    "Historical analytics with dynamic progress chart.",
-    "Date-selectable Today screen.",
-    "Debounced exercise search for smooth 60 FPS filtering.",
-    "Process Death resilience — never lose your navigation state.",
-    "Critical memory leak fixes and architecture improvements."
+    "Forgot Password Flow — password reset capability using Firebase Auth.",
+    "ForgotPasswordScreen — custom vertical gradient theme with inline animated success indicator.",
+    "Input focus chaining — fluid keyboard navigation (Next / Done actions) across all text fields.",
+    "Google Sign-In branding — compliant layout and asset conforming to Google's official design specs.",
+    "WCAG AA-compliant colors — enhanced field contrast ratios (> 4.5:1) over dark gradients.",
+    "Refactored authentication screens — unified vertical gradient backgrounds and new brand dumbbell assets.",
+    "Loading state lockouts — disabled inputs and actions during active Firebase requests to prevent race conditions."
   ]
 }
+

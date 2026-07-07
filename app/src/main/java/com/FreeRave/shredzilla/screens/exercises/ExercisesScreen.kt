@@ -273,7 +273,7 @@ fun SortOptionsMenu(
         onDismissRequest = onDismissRequest,
         modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        SortOption.values().forEach { option ->
+        SortOption.entries.forEach { option ->
             DropdownMenuItem(
                 text = { Text(option.displayName, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 onClick = {

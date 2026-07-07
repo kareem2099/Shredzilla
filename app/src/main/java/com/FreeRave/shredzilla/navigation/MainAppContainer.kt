@@ -70,6 +70,14 @@ fun MainAppContainer(
 
     LaunchedEffect(currentUser?.uid) {
         userDataManager.setupFirestoreListeners(currentUser)
+        currentUser?.uid?.let { uid ->
+            mainViewModel.loadHistoricalAnalytics(uid)
+        }
+    }
+
+    val analyticsData by mainViewModel.analyticsGraphData.collectAsState()
+    val activeDays = remember(analyticsData) {
+        analyticsData.values.flatten().map { it.timestampDate }.toSet()
     }
 
     val searchQuery by mainViewModel.searchQuery.collectAsState()
@@ -116,9 +124,9 @@ fun MainAppContainer(
         NavHost(navController = bottomBarNavController, startDestination = BottomNavItem.Sets.route, modifier = Modifier.padding(innerPadding)) {
             composable(BottomNavItem.Today.route) {
                 TodayScreen(
-                    Modifier.fillMaxSize(),
-                    mainNavController,
-                    userDataManager.todayTotalReps,
+                    modifier = Modifier.fillMaxSize(),
+                    activeDays = activeDays,
+                    totalReps = userDataManager.todayTotalReps,
                     userDataManager.todayTotalSets,
                     userDataManager.todayUniqueExercises,
                     userDataManager.todayRecordedSetsList,
@@ -127,18 +135,15 @@ fun MainAppContainer(
                         currentUser?.uid?.let { uid ->
                             userDataManager.loadSetsForDate(uid, selectedDate)
                         }
+                    },
+                    onNavigateToExerciseDetail = { exerciseName ->
+                        val exerciseId = exerciseName.lowercase().replace(" ", "_")
+                        bottomBarNavController.navigate(AppRoutes.EXERCISE_DETAIL.replace("{exerciseId}", exerciseId))
                     }
                 )
             }
             composable(BottomNavItem.Sets.route) {
-                val analyticsData by mainViewModel.analyticsGraphData.collectAsState()
                 val isAnalyticsLoading by mainViewModel.isAnalyticsLoading.collectAsState()
-
-                LaunchedEffect(currentUser?.uid) {
-                    currentUser?.uid?.let { uid ->
-                        mainViewModel.loadHistoricalAnalytics(uid)
-                    }
-                }
 
                 SetGraphScreen(
                     analyticsGraphData = analyticsData,
@@ -279,16 +284,7 @@ fun MainAppContainer(
                     allExercises = exercisesForSelection,
                     onNavigateBack = { bottomBarNavController.popBackStack() },
                     onSaveList = { _, listName, selectedExerciseIds ->
-                        val newListData = hashMapOf(
-                            "name" to listName,
-                            "exerciseIds" to selectedExerciseIds,
-                            "createdAt" to FieldValue.serverTimestamp()
-                        )
-                        currentUser?.uid?.let { userId ->
-                            db.collection("users").document(userId).collection("exerciseLists").add(newListData)
-                                .addOnSuccessListener { Log.d("Firestore", "New list '$listName' saved.") }
-                                .addOnFailureListener { e -> Log.e("Firestore", "Error saving list '$listName'", e) }
-                        }
+                        userDataManager.createNewList(listName, selectedExerciseIds, currentUser)
                         bottomBarNavController.popBackStack()
                     }
                 )
@@ -316,11 +312,8 @@ fun MainAppContainer(
                     exercisesDisplayInfo = exercisesForDetailScreen,
                     onNavigateBack = { bottomBarNavController.popBackStack() },
                     onDeleteExerciseFromList = { exerciseNameToDelete, currentListId ->
-                        currentUser?.uid?.let { userId ->
-                            val exerciseIdToDelete = exerciseNameToDelete.lowercase().replace(" ", "_")
-                            db.collection("users").document(userId).collection("exerciseLists").document(currentListId)
-                                .update("exerciseIds", FieldValue.arrayRemove(exerciseIdToDelete))
-                        }
+                        val exerciseIdToDelete = exerciseNameToDelete.lowercase().replace(" ", "_")
+                        userDataManager.removeExerciseFromList(currentListId, exerciseIdToDelete, currentUser)
                     },
                     onRecordExercise = recordSetAndStartTimerAction,
                     isTimerRunning = timerManager.isTimerRunning,
@@ -352,14 +345,7 @@ fun MainAppContainer(
                         onNavigateBack = { bottomBarNavController.popBackStack() },
                         onSaveList = { existingListId, updatedListName, updatedExerciseIds ->
                             if (existingListId != null) {
-                                val listUpdateData = hashMapOf(
-                                    "name" to updatedListName,
-                                    "exerciseIds" to updatedExerciseIds
-                                )
-                                currentUser?.uid?.let { userId ->
-                                    db.collection("users").document(userId).collection("exerciseLists").document(existingListId)
-                                        .set(listUpdateData, SetOptions.merge())
-                                }
+                                userDataManager.updateList(existingListId, updatedListName, updatedExerciseIds, currentUser)
                             }
                             bottomBarNavController.popBackStack()
                         },

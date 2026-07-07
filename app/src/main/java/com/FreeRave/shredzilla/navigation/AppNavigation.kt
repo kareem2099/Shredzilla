@@ -81,7 +81,8 @@ fun AppNavigationHost(
                             onGoogleSignInClick = {
                                 firebaseGoogleAuthManager.signInWithGoogle(googleSignInLauncher)
                             },
-                            onNavigateToRegister = { navController.navigate(AppRoutes.REGISTER) }
+                            onNavigateToRegister = { navController.navigate(AppRoutes.REGISTER) },
+                            onNavigateToForgotPassword = { navController.navigate(AppRoutes.FORGOT_PASSWORD) }
                         )
                     }
                     composable(AppRoutes.REGISTER) {
@@ -102,7 +103,31 @@ fun AppNavigationHost(
                             onNavigateToLogin = { navController.popBackStack() }
                         )
                     }
-                }
+                    composable(AppRoutes.FORGOT_PASSWORD) {
+                        var isEmailSent by remember { mutableStateOf(false) }
+                        ForgotPasswordScreen(
+                            onSendResetEmail = { email ->
+                                mainViewModel.viewModelScope.launch {
+                                    isLoading = true
+                                    val result = firebaseEmailAuthManager.sendPasswordResetEmail(email)
+                                    if (result.isSuccess) {
+                                        isEmailSent = true
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            "Error: ${result.exceptionOrNull()?.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                    isLoading = false
+                                }
+                            },
+                            onNavigateBack = { navController.popBackStack() },
+                            isLoading = isLoading,
+                            isEmailSent = isEmailSent
+                        )
+                    }
+                } // end auth navigation
 
                 navigation(startDestination = AppRoutes.GENDER_SELECTION, route = AppRoutes.ONBOARDING) {
                     composable(AppRoutes.GENDER_SELECTION) {

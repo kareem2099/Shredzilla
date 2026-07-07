@@ -106,7 +106,7 @@ fun TodayScreen(
 
     modifier: Modifier = Modifier,
 
-    mainNavController: NavHostController?,
+    activeDays: Set<Long>,
 
     totalReps: Int,
 
@@ -118,7 +118,9 @@ fun TodayScreen(
 
     unitSystem: UnitSystem,
 
-    onDateSelected: (Date) -> Unit
+    onDateSelected: (Date) -> Unit,
+
+    onNavigateToExerciseDetail: (String) -> Unit
 
 ) {
 
@@ -130,7 +132,7 @@ fun TodayScreen(
 
 
 
-    fun getDaysForDisplayedMonth(month: Int, year: Int): List<DayItem> {
+    fun getDaysForDisplayedMonth(month: Int, year: Int, activeDaysSet: Set<Long>): List<DayItem> {
 
         val list = ArrayList<DayItem>()
 
@@ -146,11 +148,13 @@ fun TodayScreen(
 
             cal.set(Calendar.DAY_OF_MONTH, i)
 
-            // Prevent java.util.Random inside UI building to abolish state flickering.
+            val dayStartCal = Calendar.getInstance().apply {
+                time = cal.time
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }
+            val hasActivity = activeDaysSet.contains(dayStartCal.timeInMillis) || (dayStartCal.timeInMillis == Calendar.getInstance().apply { time = Date(); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis && recordedSetsToday.isNotEmpty())
 
-            val mockHasActivity = false
-
-            list.add(DayItem(sdfDayOfMonth.format(cal.time), sdfDayOfWeek.format(cal.time), cal.time, hasActivity = mockHasActivity))
+            list.add(DayItem(sdfDayOfMonth.format(cal.time), sdfDayOfWeek.format(cal.time), cal.time, hasActivity = hasActivity))
 
         }
 
@@ -160,7 +164,7 @@ fun TodayScreen(
 
 
 
-    var daysInCurrentMonth by remember(displayMonth, displayYear) { mutableStateOf(getDaysForDisplayedMonth(displayMonth, displayYear)) }
+    var daysInCurrentMonth by remember(displayMonth, displayYear, activeDays, recordedSetsToday.size) { mutableStateOf(getDaysForDisplayedMonth(displayMonth, displayYear, activeDays)) }
 
     val todayDayOfMonthStr = SimpleDateFormat("d", Locale.getDefault()).format(Date())
 
@@ -200,7 +204,7 @@ fun TodayScreen(
 
                         displayMonth = calNew.get(Calendar.MONTH); displayYear = calNew.get(Calendar.YEAR)
 
-                        val newDaysList = getDaysForDisplayedMonth(displayMonth, displayYear)
+                        val newDaysList = getDaysForDisplayedMonth(displayMonth, displayYear, activeDays)
 
                         selectedDay = newDaysList.find { val calExisting = Calendar.getInstance().apply { time = it.fullDate }; calExisting.get(Calendar.YEAR) == displayYear && calExisting.get(Calendar.DAY_OF_YEAR) == calNew.get(Calendar.DAY_OF_YEAR) } ?: newDaysList.first()
 
@@ -304,7 +308,7 @@ fun TodayScreen(
 
                             fontWeight = FontWeight.Bold, 
 
-                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp), 
+                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp).clickable { onNavigateToExerciseDetail(exerciseName) }, 
 
                             color = MaterialTheme.colorScheme.onBackground
 
@@ -416,7 +420,7 @@ fun TodayScreenDarkPreview() {
 
             TodayScreen(
 
-                mainNavController = null,
+                activeDays = emptySet(),
 
                 totalReps = 53, totalSets = 9, uniqueExercises = 3,
 
@@ -430,7 +434,9 @@ fun TodayScreenDarkPreview() {
 
                 unitSystem = UnitSystem.METRIC,
 
-                onDateSelected = {}
+                onDateSelected = {},
+
+                onNavigateToExerciseDetail = {}
 
             )
 
@@ -454,7 +460,7 @@ fun TodayScreenLightPreview() {
 
             TodayScreen(
 
-                mainNavController = null,
+                activeDays = emptySet(), // Added activeDays for consistency with the instruction's implied usage
 
                 totalReps = 53, totalSets = 9, uniqueExercises = 3,
 
@@ -466,7 +472,9 @@ fun TodayScreenLightPreview() {
 
                 unitSystem = UnitSystem.IMPERIAL,
 
-                onDateSelected = {}
+                onDateSelected = {},
+
+                onNavigateToExerciseDetail = {}
 
             )
 

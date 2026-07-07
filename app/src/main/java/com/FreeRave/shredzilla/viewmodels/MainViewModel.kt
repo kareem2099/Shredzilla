@@ -31,6 +31,10 @@ class MainViewModel(
     private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
 
+    companion object {
+        private const val CACHE_EXPIRY_MS = 30 * 60 * 1000L // 30 minutes
+    }
+
     // Process Death secure destination state
     val startDestinationFlow = savedStateHandle.getStateFlow<String?>("startDestination", null)
     
@@ -74,8 +78,12 @@ class MainViewModel(
     private val _isAnalyticsLoading = MutableStateFlow(false)
     val isAnalyticsLoading = _isAnalyticsLoading.asStateFlow()
 
+    private var lastAnalyticsLoadTimeMillis: Long = 0
+
     fun loadHistoricalAnalytics(userId: String) {
-        if (_analyticsGraphData.value.isNotEmpty() || _isAnalyticsLoading.value) return // Cached!
+        val currentTime = System.currentTimeMillis()
+        val isCacheExpired = currentTime - lastAnalyticsLoadTimeMillis > CACHE_EXPIRY_MS
+        if (!isCacheExpired && (_analyticsGraphData.value.isNotEmpty() || _isAnalyticsLoading.value)) return // Cached and valid!
 
         _isAnalyticsLoading.value = true
         viewModelScope.launch {
@@ -133,6 +141,7 @@ class MainViewModel(
                 }
 
                 _analyticsGraphData.value = chartPoints
+                lastAnalyticsLoadTimeMillis = System.currentTimeMillis()
             } catch (e: Exception) {
                 // Handle silently
             } finally {

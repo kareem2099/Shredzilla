@@ -5,6 +5,7 @@ object AppRoutes {
     const val AUTH = "auth_flow"
     const val LOGIN = "login"
     const val REGISTER = "register"
+    const val FORGOT_PASSWORD = "forgot_password"
     const val ONBOARDING = "onboarding_flow"
     const val GENDER_SELECTION = "gender_selection"
     const val PHYSICAL_DETAILS = "physical_details"

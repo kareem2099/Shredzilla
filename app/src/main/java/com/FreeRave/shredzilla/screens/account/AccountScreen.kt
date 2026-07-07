@@ -153,7 +153,7 @@ fun AccountScreen(
         ImageStorageUtils.loadImageFromPath(path)?.asImageBitmap()?.let {
             androidx.compose.ui.graphics.painter.BitmapPainter(it)
         }
-    } ?: painterResource(id = R.drawable.male_choose) 
+    }
 
     Scaffold(
         topBar = {
@@ -170,7 +170,11 @@ fun AccountScreen(
             // ... (rest of the UI: Image, Text for username/email, Cards for actions) ...
             // This part remains the same as before
             Spacer(modifier = Modifier.height(16.dp))
-            Image(painter = painter, contentDescription = "Profile Image", modifier = Modifier.size(100.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            if (painter != null && localProfileImagePath != null) {
+                Image(painter = painter, contentDescription = "Profile Image", modifier = Modifier.size(100.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            } else {
+                Image(painter = painterResource(id = R.drawable.icon), contentDescription = "Profile Image", modifier = Modifier.size(100.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = userName ?: "Username not set", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(text = userEmail ?: "email@example.com", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

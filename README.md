@@ -95,21 +95,25 @@ Shredzilla replaces your workout notebook with a blazing-fast, offline-capable f
 
 ## Roadmap
 
-### v1.2.0 — Core Workflow Stability *(Current)*
-- [x] Offline-First Optimistic UI for set logging
-- [x] Zero-Drift delta-math rest timer
-- [x] Debounced exercise search with ViewModel StateFlow
-- [x] Historical analytics with dynamic progress chart
-- [x] Date-selectable Today screen
-
-### v1.3.0 — UI Polish & Feature Completeness *(Planned)*
+### v1.3.0 — Modernized Authentication & UX Polish *(Current)*
+- [x] Revamped auth screens (Login & Register) with custom vertical gradients and brand assets
+- [x] Fully compliant Google Sign-in buttons (official branding specs)
+- [x] Input focus chaining via FocusRequesters & keyboard Done actions
+- [x] Single-source-of-truth email format & field validation logic
+- [x] Loading state lockouts to prevent double-submissions
+- [x] Integrated Forgot Password flow with inline animated success confirmation
 - [ ] Real workout activity indicators on the day strip
 - [ ] Per-exercise chart selector
 - [ ] LazyColumn pagination for large exercise lists
 - [ ] Screen transition animations
 - [ ] Analytics cache via `SavedStateHandle`
 
-> See [`todo_list(v1.3.0).json`](todo_list(v1.3.0).json) for the complete milestone breakdown.
+### v1.2.0 — Core Workflow Stability
+- [x] Offline-First Optimistic UI for set logging
+- [x] Zero-Drift delta-math rest timer
+- [x] Debounced exercise search with ViewModel StateFlow
+- [x] Historical analytics with dynamic progress chart
+- [x] Date-selectable Today screen
 
 ---
 

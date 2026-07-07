@@ -480,4 +480,35 @@ class UserDataManager(
     fun convertToDisplayWeight(storageWeightKg: Double): Double {
         return if (userUnitSystem == UnitSystem.IMPERIAL) storageWeightKg / 0.45359237 else storageWeightKg
     }
+
+    fun createNewList(listName: String, selectedExerciseIds: List<String>, currentUser: FirebaseUser?) {
+        val newListData = hashMapOf(
+            "name" to listName,
+            "exerciseIds" to selectedExerciseIds,
+            "createdAt" to FieldValue.serverTimestamp()
+        )
+        currentUser?.uid?.let { userId ->
+            db.collection("users").document(userId).collection("exerciseLists").add(newListData)
+                .addOnSuccessListener { Log.d("Firestore", "New list '$listName' saved.") }
+                .addOnFailureListener { e -> Log.e("Firestore", "Error saving list '$listName'", e) }
+        }
+    }
+
+    fun removeExerciseFromList(listId: String, exerciseIdToDelete: String, currentUser: FirebaseUser?) {
+        currentUser?.uid?.let { userId ->
+            db.collection("users").document(userId).collection("exerciseLists").document(listId)
+                .update("exerciseIds", FieldValue.arrayRemove(exerciseIdToDelete))
+        }
+    }
+
+    fun updateList(listId: String, updatedListName: String, updatedExerciseIds: List<String>, currentUser: FirebaseUser?) {
+        val listUpdateData = hashMapOf(
+            "name" to updatedListName,
+            "exerciseIds" to updatedExerciseIds
+        )
+        currentUser?.uid?.let { userId ->
+            db.collection("users").document(userId).collection("exerciseLists").document(listId)
+                .set(listUpdateData, SetOptions.merge())
+        }
+    }
 }

@@ -59,6 +59,15 @@ class FirebaseEmailPasswordAuth {
         auth.signOut()
     }
 
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
+        return try {
+            auth.sendPasswordResetEmail(email).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun updateUserOnboardingData(userId: String, data: Map<String, Any>): Result<Unit> {
         return try {
             db.collection("users").document(userId)

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Lightning bolt -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,8 L28,52 L44,52 L40,88 L68,44 L52,44 Z" />
+
+    <!-- Inner highlight -->
+    <path
+        android:fillColor="#B388FF"
+        android:pathData="M52,20 L36,48 L46,48 L43,70 L62,46 L50,46 Z" />
+
+</vector>

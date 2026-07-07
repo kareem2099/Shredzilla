@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "com.FreeRave.shredzilla"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.FreeRave.shredzilla"
         minSdk = 29
-        targetSdk = 36
-        versionCode = 5
-        versionName = "1.2.0"
+        targetSdk = 37
+        versionCode = 6
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,49 +22,43 @@ import com.FreeRave.shredzilla.ui.theme.*
 import java.util.Calendar
 
 @Composable
-fun DayPill(dayItem: DayItem, isSelected: Boolean, onDaySelected: () -> Unit) {
-    val darkTheme = isSystemInDarkTheme()
-    val genderTheme = ThemeManager.currentGenderTheme
-    val todayCalendar = Calendar.getInstance()
-    val itemCalendar = Calendar.getInstance().apply { time = dayItem.fullDate }
-    val isToday = todayCalendar.get(Calendar.DAY_OF_YEAR) == itemCalendar.get(Calendar.DAY_OF_YEAR) &&
-                  todayCalendar.get(Calendar.YEAR) == itemCalendar.get(Calendar.YEAR)
-
-    val backgroundColor = when {
-        isToday && dayItem.hasActivity -> if (genderTheme == "Female") (if (darkTheme) FemaleWorkoutDayPinkDark else FemaleWorkoutDayPinkLight) else (if (darkTheme) WorkoutDayBlueDark else WorkoutDayBlueLight)
-        isToday -> if (genderTheme == "Female") (if (darkTheme) FemaleTodayHighlightPinkDark else FemaleTodayHighlightPinkLight) else (if (darkTheme) TodayHighlightGreenDark else TodayHighlightGreenLight)
-        dayItem.hasActivity -> if (genderTheme == "Female") (if (darkTheme) FemaleWorkoutDayPinkDark else FemaleWorkoutDayPinkLight) else (if (darkTheme) WorkoutDayBlueDark else WorkoutDayBlueLight)
-        else -> if (genderTheme == "Female") (if (darkTheme) FemaleNoActivityDayGrayDark else FemaleNoActivityDayGrayLight) else (if (darkTheme) NoActivityDayGrayDark else NoActivityDayGrayLight)
-    }.copy(alpha = if (isSelected) 1f else 0.7f)
-
-    val textColor = when {
-         isToday && dayItem.hasActivity -> if (darkTheme) Color.Black else Color.White
-         isToday -> if (darkTheme) Color.Black else Color.White
-         dayItem.hasActivity -> if (darkTheme) Color.Black else Color.White
-         isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-     val pillModifier = Modifier
-        .clip(RoundedCornerShape(8.dp)) // Slightly smaller rounding
-        .clickable(onClick = onDaySelected)
-        .background(backgroundColor)
-        .padding(vertical = 6.dp, horizontal = 8.dp) // Reduced horizontal padding
-
+fun DayPill(
+    dayItem: DayItem,
+    isSelected: Boolean,
+    onDaySelected: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = pillModifier
+        modifier = Modifier.clickable { onDaySelected() }.padding(4.dp)
     ) {
-        Text(
-            text = dayItem.dayOfWeekShort.take(1).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor.copy(alpha = 0.7f)
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = dayItem.dayOfMonth,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
-            color = textColor
-        )
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .size(width = 45.dp, height = 60.dp)
+                .background(
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = dayItem.dayOfWeekShort.take(1).uppercase(), style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = dayItem.dayOfMonth, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+            }
+        }
+
+        if (dayItem.hasActivity) {
+            Spacer(modifier = Modifier.height(4.dp))
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+            )
+        } else {
+            // Invisible spacer to maintain height even without a dot
+            Spacer(modifier = Modifier.height(10.dp))
+        }
     }
 }

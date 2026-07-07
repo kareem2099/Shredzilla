@@ -2,6 +2,7 @@ package com.FreeRave.shredzilla.auth.composables
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -31,90 +32,93 @@ fun PasswordFormField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     imeAction: ImeAction = ImeAction.Done,
     isError: Boolean = false,
     errorMessage: String? = null,
-    leadingIcon: @Composable (() -> Unit)? = null // New parameter for leading icon
+    leadingIcon: @Composable (() -> Unit)? = null,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    customColors: TextFieldColors? = null // Override for dark-background screens (auth)
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // Theme checks
-    val currentGender = ThemeManager.currentGenderTheme
-    val effectiveThemeSetting = ThemeManager.getEffectiveThemeSetting(
-        currentGender,
-        ThemeManager.themePreferenceMale,
-        ThemeManager.themePreferenceFemale
-    )
-    val useDarkTheme = when (effectiveThemeSetting) {
-        ThemeSetting.LIGHT -> false
-        ThemeSetting.DARK -> true
-        ThemeSetting.SYSTEM -> isSystemInDarkTheme()
-    }
-
-    // val GreenColor = TextFieldGreen // Custom green is no longer used
-
-    val finalTextFieldColors = if (useDarkTheme) {
-        OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Purple80,
-            unfocusedTextColor = Purple80,
-            focusedLabelColor = Purple80.copy(alpha = 0.75f),
-            unfocusedLabelColor = Purple80.copy(alpha = 0.5f),
-            cursorColor = Purple80,
-            focusedBorderColor = Purple80,
-            unfocusedBorderColor = Purple80.copy(alpha = 0.5f),
-            disabledTextColor = Purple80.copy(alpha = 0.5f),
-            disabledLabelColor = Purple80.copy(alpha = 0.38f),
-            disabledBorderColor = Purple80.copy(alpha = 0.38f),
-            errorTextColor = Pink80, // Using Pink for errors in purple theme
-            errorLabelColor = Pink80,
-            errorBorderColor = Pink80,
-            errorCursorColor = Pink80,
-            focusedSupportingTextColor = Pink80.copy(alpha = 0.75f),
-            unfocusedSupportingTextColor = Pink80.copy(alpha = 0.5f),
-            focusedContainerColor = PurpleGrey40.copy(alpha = 0.7f),
-            unfocusedContainerColor = PurpleGrey40.copy(alpha = 0.7f),
-            disabledContainerColor = PurpleGrey40.copy(alpha = 0.5f),
-            errorContainerColor = PurpleGrey40.copy(alpha = 0.7f),
-            focusedLeadingIconColor = Purple80.copy(alpha = 0.75f), // Purple for icons
-            unfocusedLeadingIconColor = Purple80.copy(alpha = 0.5f),
-            disabledLeadingIconColor = Purple80.copy(alpha = 0.38f),
-            errorLeadingIconColor = Pink80,
-            focusedTrailingIconColor = Purple80.copy(alpha = 0.75f), // Purple for icons
-            unfocusedTrailingIconColor = Purple80.copy(alpha = 0.5f),
-            disabledTrailingIconColor = Purple80.copy(alpha = 0.38f),
-            errorTrailingIconColor = Pink80
+    // Lazy evaluation: theme logic runs only when no customColors are passed.
+    // Avoids wasted recomposition work in auth screens that always supply customColors.
+    val finalTextFieldColors = customColors ?: run {
+        val currentGender = ThemeManager.currentGenderTheme
+        val effectiveThemeSetting = ThemeManager.getEffectiveThemeSetting(
+            currentGender,
+            ThemeManager.themePreferenceMale,
+            ThemeManager.themePreferenceFemale
         )
-    } else { // Light Mode
-        OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Purple40,
-            unfocusedTextColor = Purple40,
-            focusedLabelColor = Purple40.copy(alpha = 0.75f),
-            unfocusedLabelColor = Purple40.copy(alpha = 0.5f),
-            cursorColor = Purple40,
-            focusedBorderColor = Purple40,
-            unfocusedBorderColor = Purple40.copy(alpha = 0.5f),
-            disabledTextColor = Purple40.copy(alpha = 0.5f),
-            disabledLabelColor = Purple40.copy(alpha = 0.38f),
-            disabledBorderColor = Purple40.copy(alpha = 0.38f),
-            errorTextColor = Pink40, // Using Pink for errors in purple theme
-            errorLabelColor = Pink40,
-            errorBorderColor = Pink40,
-            errorCursorColor = Pink40,
-            focusedSupportingTextColor = Pink40.copy(alpha = 0.75f),
-            unfocusedSupportingTextColor = Pink40.copy(alpha = 0.5f),
-            focusedContainerColor = PurpleGrey80.copy(alpha = 0.7f),
-            unfocusedContainerColor = PurpleGrey80.copy(alpha = 0.7f),
-            disabledContainerColor = PurpleGrey80.copy(alpha = 0.5f),
-            errorContainerColor = PurpleGrey80.copy(alpha = 0.7f),
-            focusedLeadingIconColor = Purple40.copy(alpha = 0.75f), // Purple for icons
-            unfocusedLeadingIconColor = Purple40.copy(alpha = 0.5f),
-            disabledLeadingIconColor = Purple40.copy(alpha = 0.38f),
-            errorLeadingIconColor = Pink40,
-            focusedTrailingIconColor = Purple40.copy(alpha = 0.75f), // Purple for icons
-            unfocusedTrailingIconColor = Purple40.copy(alpha = 0.5f),
-            disabledTrailingIconColor = Purple40.copy(alpha = 0.38f),
-            errorTrailingIconColor = Pink40
-        )
+        val useDarkTheme = when (effectiveThemeSetting) {
+            ThemeSetting.LIGHT -> false
+            ThemeSetting.DARK -> true
+            ThemeSetting.SYSTEM -> isSystemInDarkTheme()
+        }
+        if (useDarkTheme) {
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Purple80,
+                unfocusedTextColor = Purple80,
+                focusedLabelColor = Purple80.copy(alpha = 0.75f),
+                unfocusedLabelColor = Purple80.copy(alpha = 0.5f),
+                cursorColor = Purple80,
+                focusedBorderColor = Purple80,
+                unfocusedBorderColor = Purple80.copy(alpha = 0.5f),
+                disabledTextColor = Purple80.copy(alpha = 0.5f),
+                disabledLabelColor = Purple80.copy(alpha = 0.38f),
+                disabledBorderColor = Purple80.copy(alpha = 0.38f),
+                errorTextColor = Pink80,
+                errorLabelColor = Pink80,
+                errorBorderColor = Pink80,
+                errorCursorColor = Pink80,
+                focusedSupportingTextColor = Pink80.copy(alpha = 0.75f),
+                unfocusedSupportingTextColor = Pink80.copy(alpha = 0.5f),
+                focusedContainerColor = PurpleGrey40.copy(alpha = 0.7f),
+                unfocusedContainerColor = PurpleGrey40.copy(alpha = 0.7f),
+                disabledContainerColor = PurpleGrey40.copy(alpha = 0.5f),
+                errorContainerColor = PurpleGrey40.copy(alpha = 0.7f),
+                focusedLeadingIconColor = Purple80.copy(alpha = 0.75f),
+                unfocusedLeadingIconColor = Purple80.copy(alpha = 0.5f),
+                disabledLeadingIconColor = Purple80.copy(alpha = 0.38f),
+                errorLeadingIconColor = Pink80,
+                focusedTrailingIconColor = Purple80.copy(alpha = 0.75f),
+                unfocusedTrailingIconColor = Purple80.copy(alpha = 0.5f),
+                disabledTrailingIconColor = Purple80.copy(alpha = 0.38f),
+                errorTrailingIconColor = Pink80
+            )
+        } else {
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Purple40,
+                unfocusedTextColor = Purple40,
+                focusedLabelColor = Purple40.copy(alpha = 0.75f),
+                unfocusedLabelColor = Purple40.copy(alpha = 0.5f),
+                cursorColor = Purple40,
+                focusedBorderColor = Purple40,
+                unfocusedBorderColor = Purple40.copy(alpha = 0.5f),
+                disabledTextColor = Purple40.copy(alpha = 0.5f),
+                disabledLabelColor = Purple40.copy(alpha = 0.38f),
+                disabledBorderColor = Purple40.copy(alpha = 0.38f),
+                errorTextColor = Pink40,
+                errorLabelColor = Pink40,
+                errorBorderColor = Pink40,
+                errorCursorColor = Pink40,
+                focusedSupportingTextColor = Pink40.copy(alpha = 0.75f),
+                unfocusedSupportingTextColor = Pink40.copy(alpha = 0.5f),
+                focusedContainerColor = PurpleGrey80.copy(alpha = 0.7f),
+                unfocusedContainerColor = PurpleGrey80.copy(alpha = 0.7f),
+                disabledContainerColor = PurpleGrey80.copy(alpha = 0.5f),
+                errorContainerColor = PurpleGrey80.copy(alpha = 0.7f),
+                focusedLeadingIconColor = Purple40.copy(alpha = 0.75f),
+                unfocusedLeadingIconColor = Purple40.copy(alpha = 0.5f),
+                disabledLeadingIconColor = Purple40.copy(alpha = 0.38f),
+                errorLeadingIconColor = Pink40,
+                focusedTrailingIconColor = Purple40.copy(alpha = 0.75f),
+                unfocusedTrailingIconColor = Purple40.copy(alpha = 0.5f),
+                disabledTrailingIconColor = Purple40.copy(alpha = 0.38f),
+                errorTrailingIconColor = Pink40
+            )
+        }
     }
 
     OutlinedTextField(
@@ -122,12 +126,14 @@ fun PasswordFormField(
         onValueChange = onValueChange,
         label = { Text(label) },
         modifier = modifier.fillMaxWidth(),
+        enabled = enabled,
         leadingIcon = leadingIcon, // Pass leadingIcon to OutlinedTextField
         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,
             imeAction = imeAction
         ),
+        keyboardActions = keyboardActions,
         trailingIcon = {
             val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
             val description = if (passwordVisible) "Hide password" else "Show password"
@@ -138,9 +144,9 @@ fun PasswordFormField(
         isError = isError,
         supportingText = {
             if (isError && errorMessage != null) {
-                Text(text = errorMessage, color = MaterialTheme.colorScheme.error) // Ensure error message uses error color
+                Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
             }
         },
-        colors = finalTextFieldColors // Apply the determined colors
+        colors = finalTextFieldColors
     )
 }

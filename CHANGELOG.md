@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] — v1.3.0
+## [Unreleased]
 
 ### Planned
 - Real workout activity indicators on `DayPill` strip
@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LazyColumn pagination for large exercise lists
 - Screen transition animations
 - `SavedStateHandle` persistence for analytics graph data
+
+---
+
+## [1.3.0] — 2026-07-07
+
+### Added
+- **Forgot Password Flow**: Added full password reset capability using Firebase Auth.
+- **ForgotPasswordScreen**: Created a new password reset UI following the custom vertical gradient design theme, featuring an inline animated checkmark success state upon email dispatch.
+- **IME Focus Chaining**: Connected custom `FocusRequester` paths across text fields to support fluid keyboard navigation (Login: Email -> Password -> Done; Register: Name -> Email -> Password -> Confirm -> Done).
+- **Google Branding Compliance**: Redesigned the "Sign in with Google" button to fully align with official branding guidelines (pure white background, correct dimensions, original 4-color Google G icon).
+- **Strict Accessibility Ratios**: Modified custom field colors to ensure all text and borders meet or exceed WCAG-AA contrast ratios (>4.5:1) over dark gradients.
+
+### Changed
+- **Unified Auth Design Language**: Refactored `LoginScreen` and `RegisterScreen` with premium vertical gradients (`AuthBgTop`/`AuthBgBottom`) and a lightweight circular dumbbell container representing the brand logo.
+- **Centralized Color Tokens**: Migrated all hardcoded hex colors into explicit tokens inside `Color.kt` for cleaner architecture and better code reuse.
+- **Lazy Composable Theme Lookup**: Performance optimized `TextFormField` and `PasswordFormField` to avoid unnecessary ThemeManager checks during recompositions when custom colors are passed.
+- **Loading State Lockouts**: Disabled text inputs (`enabled = !isLoading`) and guarded keyboard action hooks during active Firebase authentication requests to prevent double-submissions and race conditions.
+- **Local Validation Consolidation**: Rewrote submission validation checks into unified single-source-of-truth functions (`attemptLogin()`, `attemptRegister()`), avoiding logic drift between keyboard Enter presses and button clicks.
 
 ---
 

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Left outer plate -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,34 C8,30.686 10.686,28 14,28 L20,28 C23.314,28 26,30.686 26,34 L26,62 C26,65.314 23.314,68 20,68 L14,68 C10.686,68 8,65.314 8,62 Z" />
+
+    <!-- Left inner plate -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M26,40 C26,37.791 27.791,36 30,36 L34,36 C36.209,36 38,37.791 38,40 L38,56 C38,58.209 36.209,60 34,60 L30,60 C27.791,60 26,58.209 26,56 Z" />
+
+    <!-- Bar center -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,45 L58,45 C59.105,45 60,45.895 60,47 L60,49 C60,50.105 59.105,51 58,51 L38,51 C36.895,51 36,50.105 36,49 L36,47 C36,45.895 36.895,45 38,45 Z" />
+
+    <!-- Right inner plate -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,40 C58,37.791 59.791,36 62,36 L66,36 C68.209,36 70,37.791 70,40 L70,56 C70,58.209 68.209,60 66,60 L62,60 C59.791,60 58,58.209 58,56 Z" />
+
+    <!-- Right outer plate -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M70,34 C70,30.686 72.686,28 76,28 L82,28 C85.314,28 88,30.686 88,34 L88,62 C88,65.314 85.314,68 82,68 L76,68 C72.686,68 70,65.314 70,62 Z" />
+
+</vector>

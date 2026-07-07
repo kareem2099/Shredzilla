@@ -128,3 +128,16 @@ val TodayHighlightGreenLight = Color(0xFF388E3C) // Green 700
 val TodayHighlightGreenDark = Color(0xFF81C784)  // Green 300
 val FemaleTodayHighlightPinkLight = Color(0xFFD81B60) // Pink 600
 val FemaleTodayHighlightPinkDark = Color(0xFFF48FB1) // Pink 200 (matches FemaleDarkSecondary)
+
+// ── Auth Screen Colors ────────────────────────────────────────────────────────
+// Shared background gradient for Login & Register (dark purple → near-black)
+val AuthBgTop    = Color(0xFF1B1040)
+val AuthBgBottom = Color(0xFF0C0918)
+
+// Brand gradient for Login / Register primary buttons (mono-purple, same hue palette)
+val AuthBtnGradientStart = Color(0xFF6650A4) // = Purple40 alias — explicit for gradient use
+val AuthBtnGradientEnd   = Color(0xFF9A82DB) // lighter tint of Purple40
+
+// Google Sign-In button — must stay white per Google branding guidelines
+val GoogleButtonBg      = Color(0xFFFFFFFF)
+val GoogleButtonContent = Color(0xFF1F1F1F)
