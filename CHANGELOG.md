@@ -18,6 +18,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] — 2026-11-04
+
+### Added
+- **Glass design system** with its own palette for each profile (brand, male, female), each in light and dark, applied to every screen.
+- **Redesigned onboarding**: 5 steps with a progress bar, ruler pickers for age/height/weight, and a live theme preview when choosing a profile.
+- **Floating bottom bar** with Sets, Today and Settings tabs; edge-to-edge layout.
+- **Ready-made programs**: Full Body, Upper/Lower, Push/Pull/Legs, Body Part, Glutes & Lower, Home. Beginner/Intermediate/Advanced levels suggest 4, 3–4 or 1–2 sets per exercise, shown as progress in each list.
+- **Exercise detail** for any exercise, with 90-day history, edit/delete, heaviest set and estimated 1RM.
+- **Calendar sheet** with workout-day dots and the week starting on the locale's first day.
+- Delete whole lists, multi-select when adding exercises, live password-mismatch check on sign-up.
+
+### Changed
+- The exercise library is now **per user** (`users/{uid}/exercises`), with a one-time migration, plus Firestore security rules.
+- Relicensed from MIT to the **Apache License 2.0**.
+
+### Fixed
+- Progress chart and exercise history were always empty, because day documents were never written.
+- Signing out left the previous account's data visible to the next account.
+- Account deletion left workout data behind; it now removes everything and checks for a recent login first.
+- Email sign-ups now show the user's name; login no longer gets stuck when user data fails to load.
+- Crash when reopening the app part-way through onboarding.
+- Swipe-to-delete hid rows after cancelling; the "Recent" sort did nothing; the window panned under the status bar when the keyboard opened.
+
+---
+
 ## [1.3.0] — 2026-07-07
 
 ### Added
