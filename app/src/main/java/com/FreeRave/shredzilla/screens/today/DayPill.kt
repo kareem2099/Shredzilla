@@ -1,64 +1,76 @@
 package com.FreeRave.shredzilla.screens.today
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.FreeRave.shredzilla.ui.theme.*
-import java.util.Calendar
+import com.FreeRave.shredzilla.ui.glass.glassSurface
+import com.FreeRave.shredzilla.ui.theme.glass
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
+private val PillShape = RoundedCornerShape(18.dp)
+
+/** Day in the week strip: accent fill when selected, accent outline for today, dot when trained. */
 @Composable
 fun DayPill(
-    dayItem: DayItem,
+    dayStart: Long,
     isSelected: Boolean,
-    onDaySelected: () -> Unit
+    isToday: Boolean,
+    hasActivity: Boolean,
+    onClick: () -> Unit
 ) {
+    val palette = MaterialTheme.glass
+    val (weekday, dayOfMonth) = remember(dayStart) {
+        val date = Date(dayStart)
+        SimpleDateFormat("EEE", Locale.getDefault()).format(date) to SimpleDateFormat("d", Locale.getDefault()).format(date)
+    }
+    val textColor = if (isSelected) palette.onAccent else palette.content
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onDaySelected() }.padding(4.dp)
-    ) {
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .size(width = 45.dp, height = 60.dp)
-                .background(
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(12.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = dayItem.dayOfWeekShort.take(1).uppercase(), style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(text = dayItem.dayOfMonth, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
-            }
-        }
-
-        if (dayItem.hasActivity) {
-            Spacer(modifier = Modifier.height(4.dp))
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .background(
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                        shape = androidx.compose.foundation.shape.CircleShape
-                    )
+        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+        modifier = Modifier
+            .size(width = 52.dp, height = 76.dp)
+            .clip(PillShape)
+            .then(
+                if (isSelected) Modifier.background(Brush.verticalGradient(palette.accentGradient))
+                else Modifier.glassSurface(palette, PillShape)
             )
-        } else {
-            // Invisible spacer to maintain height even without a dot
-            Spacer(modifier = Modifier.height(10.dp))
-        }
+            .border(1.5.dp, if (isToday && !isSelected) palette.accent else Color.Transparent, PillShape)
+            .clickable(role = Role.Tab, onClick = onClick)
+    ) {
+        Text(weekday, style = MaterialTheme.typography.labelSmall, color = textColor.copy(alpha = 0.75f))
+        Text(dayOfMonth, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+        Box(
+            Modifier
+                .size(5.dp)
+                .background(
+                    when {
+                        !hasActivity -> Color.Transparent
+                        isSelected -> palette.onAccent
+                        else -> palette.accent
+                    },
+                    CircleShape
+                )
+        )
     }
 }

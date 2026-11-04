@@ -27,5 +27,6 @@ object AppRoutes {
     const val EDIT_LIST_SCREEN = "edit_list_screen/{listId}" // New route for editing a list
     const val FITNESS_MAIN = "fitness_main" // Root for the main app content after auth/onboarding
     const val AD_REWARDS_SCREEN = "ad_rewards_screen" // New route for ad rewards
+    const val PROGRAMS = "programs" // Ready-made splits
     const val EXERCISE_DETAIL = "exercise_detail/{exerciseId}" // New route for individual exercise details
 }

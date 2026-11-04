@@ -5,6 +5,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.auth.userProfileChangeRequest
+
+/** Sign-up couldn't finish, so the half-created account was removed again. AuthErrorMapper keys off this text. */
+internal const val ACCOUNT_SETUP_FAILED = "Account setup failed"
 
 class FirebaseEmailPasswordAuth {
 
@@ -17,6 +21,8 @@ class FirebaseEmailPasswordAuth {
             val firebaseUser = authResult.user
             if (firebaseUser != null) {
                 try {
+                    // The app reads the name from the auth profile (greeting, settings), so set it there too
+                    firebaseUser.updateProfile(userProfileChangeRequest { displayName = name }).await()
                     // Save user details to Firestore
                     val user = hashMapOf(
                         "uid" to firebaseUser.uid,
@@ -32,7 +38,7 @@ class FirebaseEmailPasswordAuth {
                     } catch (deleteException: Exception) {
                         Log.e("Auth", "Rollback failed: ${deleteException.message}")
                     }
-                    Result.failure(Exception("Failed to save user data. Please check your connection and try again.", e))
+                    Result.failure(Exception(ACCOUNT_SETUP_FAILED, e))
                 }
             } else {
                 Result.failure(Exception("Firebase user was null after creation."))
@@ -80,15 +86,6 @@ class FirebaseEmailPasswordAuth {
     }
 
     suspend fun getUserData(userId: String): Result<Map<String, Any>?> {
-        return try {
-            val documentSnapshot = db.collection("users").document(userId).get().await()
-            if (documentSnapshot.exists()) {
-                Result.success(documentSnapshot.data)
-            } else {
-                Result.success(null) // User document doesn't exist
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return UserFirestoreHelper.getUserData(userId)
     }
 }

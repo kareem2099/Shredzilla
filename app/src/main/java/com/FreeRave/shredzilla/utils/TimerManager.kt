@@ -83,17 +83,7 @@ class TimerManager(
     // Optional: A method to update total seconds if preference changes while timer not running
     fun updateTotalSecondsFromPreference() {
         if (!isTimerRunning) {
-            val durationPreference = userRestTimePreferenceProvider()
-            var duration = 60
-            if (durationPreference.contains("min")) {
-                duration = durationPreference.substringBefore("min").toIntOrNull()?.times(60) ?: 60
-                if (durationPreference.contains("s")) {
-                    duration += durationPreference.substringAfter("min").substringBefore("s").trim().toIntOrNull() ?: 0
-                }
-            } else if (durationPreference.contains("s")) {
-                duration = durationPreference.substringBefore("s").toIntOrNull() ?: 60
-            }
-            timerTotalSeconds = duration
+            timerTotalSeconds = parseRestPreference(userRestTimePreferenceProvider())
         }
     }
 }

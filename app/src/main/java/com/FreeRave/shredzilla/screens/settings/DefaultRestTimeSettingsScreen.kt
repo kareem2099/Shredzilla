@@ -1,206 +1,101 @@
 package com.FreeRave.shredzilla.screens.settings
 
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.AvTimer
-import androidx.compose.material.icons.filled.Timer // For the timer switch icon
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.foundation.text.KeyboardOptions // For numeric input
-import androidx.compose.ui.text.input.KeyboardType // For numeric input
-import androidx.compose.ui.unit.sp // For font size
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.FreeRave.shredzilla.onboarding.RestTimeOptionCard // Assuming this is reusable
-import com.FreeRave.shredzilla.onboarding.restOptions // Assuming this is accessible
+import androidx.compose.ui.unit.sp
+import com.FreeRave.shredzilla.onboarding.RestTimeOptionCard
+import com.FreeRave.shredzilla.onboarding.restOptions
+import com.FreeRave.shredzilla.ui.glass.GlassCard
+import com.FreeRave.shredzilla.ui.glass.GlassFootnote
+import com.FreeRave.shredzilla.ui.glass.GlassIconButton
+import com.FreeRave.shredzilla.ui.glass.GlassPrimaryButton
+import com.FreeRave.shredzilla.ui.glass.GlassSubpageScaffold
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
+import com.FreeRave.shredzilla.ui.theme.glass
+import com.FreeRave.shredzilla.utils.formatRestDuration
+import com.FreeRave.shredzilla.utils.parseRestPreference
+import com.FreeRave.shredzilla.utils.restPreferenceOf
 
-@OptIn(ExperimentalMaterial3Api::class)
+private const val STEP_SECONDS = 15
+private val RestRangeSeconds = 15..600
+
+/** Default rest between sets: fine-tune in 15s steps or tap a preset, then save. */
 @Composable
 fun DefaultRestTimeSettingsScreen(
-    currentPreference: String, // e.g., "1min", "2min", "5min"
+    currentPreference: String,
     onSave: (String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    var timerEnabled by remember { mutableStateOf(true) } // For the Timer switch
-    var minutes by remember { mutableStateOf("") }
-    var seconds by remember { mutableStateOf("") }
-    var selectedPresetId by remember { mutableStateOf(currentPreference) }
+    var seconds by remember { mutableIntStateOf(parseRestPreference(currentPreference)) }
+    val palette = MaterialTheme.glass
 
-    // Initialize minutes and seconds based on currentPreference
-    LaunchedEffect(currentPreference) {
-        when (currentPreference) {
-            "1min" -> { minutes = "1"; seconds = "0" }
-            "2min" -> { minutes = "2"; seconds = "0" }
-            "5min" -> { minutes = "5"; seconds = "0" }
-            // Handle custom or other values if necessary
-            else -> {
-                // Attempt to parse if it's a custom format like "custom_MM_SSs" or just clear
-                minutes = "" // Or parse from a custom format
-                seconds = ""
-            }
-        }
-    }
-    
-    // Update selectedPresetId if custom inputs match a preset
-    LaunchedEffect(minutes, seconds) {
-        val totalSeconds = (minutes.toIntOrNull() ?: 0) * 60 + (seconds.toIntOrNull() ?: 0)
-        selectedPresetId = when (totalSeconds) {
-            60 -> "1min"
-            120 -> "2min"
-            300 -> "5min"
-            else -> "custom" // Indicate a custom time if no preset matches
-        }
-    }
-
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Default Interset Rest") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    TextButton(onClick = {
-                        val finalPreference = if (selectedPresetId != "custom") {
-                            selectedPresetId
-                        } else {
-                            // Construct a preference string for custom time, e.g., "custom_MM_SS"
-                            // For now, let's try to map to existing "Xmin" if possible, or save as total seconds
-                            val totalSec = (minutes.toIntOrNull() ?: 0) * 60 + (seconds.toIntOrNull() ?: 0)
-                            if (totalSec % 60 == 0 && totalSec / 60 in listOf(1,2,5)) {
-                                "${totalSec/60}min"
-                            } else {
-                                // Fallback or new custom format, e.g. "custom_${totalSec}s"
-                                // For simplicity, if not a preset, it won't save as a preset string.
-                                // The logic in MainAppContainer for `startRestTimer` needs to handle this.
-                                // For now, we only save if it matches a preset or is a new "Xmin" format.
-                                // This part needs more robust handling for custom times.
-                                 if (totalSec > 0) "${totalSec/60}min${if (totalSec%60 != 0) " ${totalSec%60}s" else ""}" else "1min" // Default if invalid
-                            }
-                        }
-                        onSave(finalPreference)
-                    }) {
-                        Text("Save", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Timer Toggle Row
+    GlassSubpageScaffold(
+        title = "Rest between sets",
+        eyebrow = "Settings",
+        onBack = onNavigateBack,
+        bottomBar = { GlassPrimaryButton(text = "Save", onClick = { onSave(restPreferenceOf(seconds)) }) }
+    ) {
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Timer", style = MaterialTheme.typography.titleMedium)
-                Switch(
-                    checked = timerEnabled,
-                    onCheckedChange = { timerEnabled = it },
-                    thumbContent = if (timerEnabled) {
-                        { Icon(imageVector = Icons.Filled.Timer, contentDescription = "Timer On", tint = MaterialTheme.colorScheme.primary) }
-                    } else { null }
+                GlassIconButton(
+                    icon = Icons.Filled.Remove,
+                    contentDescription = "15 seconds less",
+                    onClick = { seconds = (seconds - STEP_SECONDS).coerceIn(RestRangeSeconds) }
+                )
+                AnimatedContent(
+                    targetState = seconds,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "restSeconds"
+                ) { shown ->
+                    Text(formatRestDuration(shown), fontSize = 56.sp, fontWeight = FontWeight.Black, color = palette.content)
+                }
+                GlassIconButton(
+                    icon = Icons.Filled.Add,
+                    contentDescription = "15 seconds more",
+                    onClick = { seconds = (seconds + STEP_SECONDS).coerceIn(RestRangeSeconds) }
                 )
             }
-            HorizontalDivider()
-
-            // Custom Time Inputs
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceAround // Or SpaceBetween
-            ) {
-                OutlinedTextField(
-                    value = minutes,
-                    onValueChange = { if (it.length <= 2) minutes = it.filter { c -> c.isDigit() } },
-                    label = { Text("Minutes") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontSize = 20.sp),
-                    enabled = timerEnabled
-                )
-                Text(":", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 8.dp))
-                OutlinedTextField(
-                    value = seconds,
-                    onValueChange = { if (it.length <= 2) seconds = it.filter { c -> c.isDigit() } },
-                    label = { Text("Seconds") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                    textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.Center, fontSize = 20.sp),
-                    enabled = timerEnabled
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-             Text(
-                text = "Select the interset rest duration you'd like to use the majority of the time.",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodySmall, // Made smaller
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp)) // Adjusted spacer
-
-            Text(
-                "DEFAULT RECOMMENDATIONS",
-                style = MaterialTheme.typography.labelMedium, // Made slightly larger
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            restOptions.forEach { option ->
-                RestTimeOptionCard(
-                    option = option,
-                    isSelected = selectedPresetId == option.id,
-                    onOptionSelected = {
-                        selectedPresetId = option.id
-                        when (option.id) {
-                            "1min" -> { minutes = "1"; seconds = "0" }
-                            "2min" -> { minutes = "2"; seconds = "0" }
-                            "5min" -> { minutes = "5"; seconds = "0" }
-                        }
-                        timerEnabled = true // Ensure timer is enabled when a preset is picked
-                    }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            Spacer(modifier = Modifier.weight(1f)) // Removed heightIn for flexible spacing
         }
+        restOptions.forEach { option ->
+            val presetSeconds = parseRestPreference(option.id)
+            RestTimeOptionCard(
+                option = option,
+                isSelected = seconds == presetSeconds,
+                onOptionSelected = { seconds = presetSeconds }
+            )
+        }
+        GlassFootnote("The timer starts after every set you record and resets for the next one.")
     }
 }
 
-@Preview(showBackground = true, name = "Default Rest Time Settings")
+@Preview
 @Composable
-fun DefaultRestTimeSettingsScreenPreview() {
+private fun DefaultRestTimeSettingsScreenPreview() {
     ShredzillaTheme {
-        DefaultRestTimeSettingsScreen(
-            currentPreference = "2min",
-            onSave = {},
-            onNavigateBack = {}
-        )
+        DefaultRestTimeSettingsScreen(currentPreference = "2min", onSave = {}, onNavigateBack = {})
     }
 }

@@ -5,14 +5,18 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 
 import com.google.firebase.Timestamp // Import Firebase Timestamp
 
-// Data class for storing individual set performance
-data class ExerciseSetPerformance(
-    val setNumber: Int,
-    val reps: String,
-    val weight: String,
-    val notes: String? = null, // Added notes field
-    val timestamp: Timestamp = Timestamp.now(),
-    val firestoreDocId: String? = null
+/**
+ * One set as stored in Firestore under users/{uid}/dailyActivity/{dateKey}/recordedSets/{docId}.
+ * [dateKey] ("yyyy-MM-dd") plus [docId] is everything needed to edit or delete it.
+ */
+data class LoggedSet(
+    val docId: String,
+    val dateKey: String,
+    val exerciseId: String,
+    val reps: Int,
+    val weightKg: Double,
+    val notes: String,
+    val timestampMillis: Long
 )
 
 // Data class for an exercise item
@@ -24,14 +28,10 @@ data class ExerciseItem(
     val targetMuscles: List<String>,
     val equipmentNeeded: List<String>,
     val difficulty: String, // e.g., "Beginner", "Intermediate", "Advanced"
-    var isSelected: Boolean = false, // isSelected might be more of a UI concern for selection screens
-    var recordedSets: SnapshotStateList<ExerciseSetPerformance> = mutableStateListOf() // To store recorded sets for this exercise
+    var isSelected: Boolean = false // isSelected might be more of a UI concern for selection screens
 )
 
 // List of initial exercises - this can be the master list
-// To allow modification of recordedSets, the list itself or its items need to be managed in a way that reflects changes.
-// A ViewModel would typically manage a mutable version of this list or handle updates.
-// Changing to mutableStateListOf to make the list itself observable by Compose.
 val initialGlobalExerciseList: SnapshotStateList<ExerciseItem> = mutableStateListOf(
     ExerciseItem(
         id = "bench_press",
@@ -86,10 +86,13 @@ data class UserExerciseList(
     val id: String,
     val name: String,
     val exerciseIds: List<String>,
-    val lastPerformed: Timestamp? = null
+    val lastPerformed: Timestamp? = null,
+    /** Suggested sets per exercise when the list came from a program; null for hand-made lists. */
+    val targetSetsMin: Int? = null,
+    val targetSetsMax: Int? = null
 )
 
-// Data class for a recorded set (extended version of ExerciseSetPerformance)
+// Data class for a recorded set
 data class RecordedSet(
     val exerciseName: String,
     val setNumber: Int,
@@ -101,10 +104,14 @@ data class RecordedSet(
     val firestoreDocId: String? = null
 )
 
+/** Firestore document id / analytics key for an exercise name, e.g. "Bench Press" -> "bench_press". */
+fun exerciseIdOf(name: String): String = name.lowercase().replace(" ", "_")
+
 // Data class for exercise display information
 data class ExerciseDisplayInfo(
     val id: String,
     val name: String,
     val lastPerformed: String? = null,
+    val lastPerformedMillis: Long? = null, // for sorting; lastPerformed is the human label
     val recordedSets: List<RecordedSet> = emptyList()
 )

@@ -207,20 +207,6 @@ object RewardedAdManager {
         return System.currentTimeMillis() < expiryTime
     }
 
-    // Returns the next tier goal (ads required, duration ms) for UI display
-    // or null if all tiers are technically surpassed (though count resets)
-    fun getNextRewardTierInfo(context: Context): Pair<Int, Long>? {
-        val currentWatchCount = getAdsWatchedCount(context)
-        // Find the lowest tier that the user hasn't reached yet
-        return REWARD_TIERS.sortedBy { it.first }.find { currentWatchCount < it.first }
-    }
-    
-    // Gets the lowest tier's ad requirement for initial display if no progress
-    fun getLowestTierAdsRequired(): Int {
-        return REWARD_TIERS.minByOrNull { it.first }?.first ?: 10 // Default to 10 if list is empty
-    }
-
-
     fun getRemainingAdFreeTimeFormatted(context: Context): String {
         if (!isAdFree(context)) return "Not active"
         val remainingMs = getAdFreeExpiryTimeMs(context) - System.currentTimeMillis()

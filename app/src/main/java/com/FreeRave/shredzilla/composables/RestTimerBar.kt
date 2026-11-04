@@ -1,21 +1,43 @@
 package com.FreeRave.shredzilla.composables
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.concurrent.TimeUnit
+import com.FreeRave.shredzilla.ui.glass.GlassIconButton
+import com.FreeRave.shredzilla.ui.glass.glassSurface
+import com.FreeRave.shredzilla.ui.theme.glass
+import java.util.Locale
 
+private val TimerShape = RoundedCornerShape(24.dp)
+
+/** Frosted rest-timer strip shown while a rest countdown is running. */
 @Composable
 fun RestTimerBar(
     remainingSeconds: Int,
@@ -23,54 +45,58 @@ fun RestTimerBar(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (totalSeconds <= 0) return // Don't display if totalSeconds is invalid
+    if (totalSeconds <= 0) return // Nothing meaningful to show
 
-    val progress = if (totalSeconds > 0) remainingSeconds.toFloat() / totalSeconds.toFloat() else 0f
-    val timeFormatted = String.format(
-        "%02d:%02d",
-        TimeUnit.SECONDS.toMinutes(remainingSeconds.toLong()),
-        remainingSeconds % 60
+    val palette = MaterialTheme.glass
+    val progress by animateFloatAsState(
+        targetValue = (remainingSeconds.toFloat() / totalSeconds).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 300),
+        label = "timerProgress"
     )
+    val timeFormatted = String.format(Locale.US, "%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
 
-    Card(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = CircleShape, // Makes it pill-shaped
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .glassSurface(palette, TimerShape)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = timeFormatted,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Next Set",
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-            )
-            CircularProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.size(24.dp),
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 3.dp
-            )
-            IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Close Timer",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = palette.accent,
+                    trackColor = palette.accent.copy(alpha = 0.15f),
+                    strokeWidth = 3.dp,
+                    strokeCap = StrokeCap.Round
                 )
+                Icon(Icons.Filled.Timer, contentDescription = null, tint = palette.accent, modifier = Modifier.size(20.dp))
             }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(timeFormatted, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = palette.content)
+                Text("Rest · next set soon", style = MaterialTheme.typography.labelMedium, color = palette.contentMuted)
+            }
+            GlassIconButton(Icons.Filled.Close, contentDescription = "Stop rest timer", onClick = onClose)
+        }
+        // Thin bar along the bottom edge mirrors the ring for at-a-glance progress
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(palette.accent.copy(alpha = 0.12f))
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(progress)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Brush.horizontalGradient(palette.accentGradient))
+            )
         }
     }
 }

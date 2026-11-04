@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -56,12 +57,24 @@ private val DefaultLightColorScheme = lightColorScheme(
 private val MaleDarkColorScheme = darkColorScheme(
     primary = MaleDarkPrimary,
     onPrimary = MaleDarkOnPrimary,
+    primaryContainer = MaleDarkPrimaryContainer,
+    onPrimaryContainer = MaleDarkOnPrimaryContainer,
     secondary = MaleDarkSecondary,
     onSecondary = MaleDarkOnSecondary,
+    secondaryContainer = MaleDarkSecondaryContainer,
+    onSecondaryContainer = MaleDarkOnSecondaryContainer,
+    tertiary = MaleDarkTertiary,
+    onTertiary = MaleDarkOnTertiary,
+    tertiaryContainer = MaleDarkTertiaryContainer,
+    onTertiaryContainer = MaleDarkOnTertiaryContainer,
     background = MaleDarkBackground,
     onBackground = MaleDarkOnBackground,
     surface = MaleDarkSurface,
     onSurface = MaleDarkOnSurface,
+    surfaceVariant = MaleDarkSurfaceVariant,
+    onSurfaceVariant = MaleDarkOnSurfaceVariant,
+    outline = MaleDarkOutline,
+    outlineVariant = MaleDarkOutlineVariant,
     error = MaleDarkError,
     onError = MaleDarkOnError,
     errorContainer = MaleDarkErrorContainer,
@@ -71,12 +84,24 @@ private val MaleDarkColorScheme = darkColorScheme(
 private val MaleLightColorScheme = lightColorScheme(
     primary = MaleLightPrimary,
     onPrimary = MaleLightOnPrimary,
+    primaryContainer = MaleLightPrimaryContainer,
+    onPrimaryContainer = MaleLightOnPrimaryContainer,
     secondary = MaleLightSecondary,
     onSecondary = MaleLightOnSecondary,
+    secondaryContainer = MaleLightSecondaryContainer,
+    onSecondaryContainer = MaleLightOnSecondaryContainer,
+    tertiary = MaleLightTertiary,
+    onTertiary = MaleLightOnTertiary,
+    tertiaryContainer = MaleLightTertiaryContainer,
+    onTertiaryContainer = MaleLightOnTertiaryContainer,
     background = MaleLightBackground,
     onBackground = MaleLightOnBackground,
     surface = MaleLightSurface,
     onSurface = MaleLightOnSurface,
+    surfaceVariant = MaleLightSurfaceVariant,
+    onSurfaceVariant = MaleLightOnSurfaceVariant,
+    outline = MaleLightOutline,
+    outlineVariant = MaleLightOutlineVariant,
     error = MaleLightError,
     onError = MaleLightOnError,
     errorContainer = MaleLightErrorContainer,
@@ -87,12 +112,24 @@ private val MaleLightColorScheme = lightColorScheme(
 private val FemaleDarkColorScheme = darkColorScheme(
     primary = FemaleDarkPrimary,
     onPrimary = FemaleDarkOnPrimary,
+    primaryContainer = FemaleDarkPrimaryContainer,
+    onPrimaryContainer = FemaleDarkOnPrimaryContainer,
     secondary = FemaleDarkSecondary,
     onSecondary = FemaleDarkOnSecondary,
+    secondaryContainer = FemaleDarkSecondaryContainer,
+    onSecondaryContainer = FemaleDarkOnSecondaryContainer,
+    tertiary = FemaleDarkTertiary,
+    onTertiary = FemaleDarkOnTertiary,
+    tertiaryContainer = FemaleDarkTertiaryContainer,
+    onTertiaryContainer = FemaleDarkOnTertiaryContainer,
     background = FemaleDarkBackground,
     onBackground = FemaleDarkOnBackground,
     surface = FemaleDarkSurface,
     onSurface = FemaleDarkOnSurface,
+    surfaceVariant = FemaleDarkSurfaceVariant,
+    onSurfaceVariant = FemaleDarkOnSurfaceVariant,
+    outline = FemaleDarkOutline,
+    outlineVariant = FemaleDarkOutlineVariant,
     error = FemaleDarkError,
     onError = FemaleDarkOnError,
     errorContainer = FemaleDarkErrorContainer,
@@ -102,12 +139,24 @@ private val FemaleDarkColorScheme = darkColorScheme(
 private val FemaleLightColorScheme = lightColorScheme(
     primary = FemaleLightPrimary,
     onPrimary = FemaleLightOnPrimary,
+    primaryContainer = FemaleLightPrimaryContainer,
+    onPrimaryContainer = FemaleLightOnPrimaryContainer,
     secondary = FemaleLightSecondary,
     onSecondary = FemaleLightOnSecondary,
+    secondaryContainer = FemaleLightSecondaryContainer,
+    onSecondaryContainer = FemaleLightOnSecondaryContainer,
+    tertiary = FemaleLightTertiary,
+    onTertiary = FemaleLightOnTertiary,
+    tertiaryContainer = FemaleLightTertiaryContainer,
+    onTertiaryContainer = FemaleLightOnTertiaryContainer,
     background = FemaleLightBackground,
     onBackground = FemaleLightOnBackground,
     surface = FemaleLightSurface,
     onSurface = FemaleLightOnSurface,
+    surfaceVariant = FemaleLightSurfaceVariant,
+    onSurfaceVariant = FemaleLightOnSurfaceVariant,
+    outline = FemaleLightOutline,
+    outlineVariant = FemaleLightOutlineVariant,
     error = FemaleLightError,
     onError = FemaleLightOnError,
     errorContainer = FemaleLightErrorContainer,
@@ -123,18 +172,7 @@ fun ShredzillaTheme(
     content: @Composable () -> Unit
 ) {
     val currentGender = ThemeManager.currentGenderTheme
-    // These preferences are now reactive states in ThemeManager, updated by MainAppContainer
-    val effectiveThemeSetting = ThemeManager.getEffectiveThemeSetting(
-        currentGender,
-        ThemeManager.themePreferenceMale,
-        ThemeManager.themePreferenceFemale
-    )
-
-    val useDarkTheme = when (effectiveThemeSetting) {
-        ThemeSetting.LIGHT -> false
-        ThemeSetting.DARK -> true
-        ThemeSetting.SYSTEM -> isSystemInDarkTheme()
-    }
+    val useDarkTheme = isAppInDarkTheme()
 
     val baseColorScheme = when (currentGender) {
         "Male" -> if (useDarkTheme) MaleDarkColorScheme else MaleLightColorScheme
@@ -157,15 +195,35 @@ fun ShredzillaTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
+            // Bars are transparent (edge-to-edge); only the icon contrast follows the app theme
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb() // Or another appropriate color
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDarkTheme // True if light theme
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !useDarkTheme
+            insetsController.isAppearanceLightNavigationBars = !useDarkTheme
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
+    CompositionLocalProvider(LocalGlassPalette provides glassPaletteFor(currentGender, useDarkTheme)) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
+}
+
+/** Dark/light decision for the current gender's saved theme preference (single source of truth). */
+@Composable
+fun isAppInDarkTheme(): Boolean {
+    // These preferences are reactive states in ThemeManager, updated by MainAppContainer
+    val effectiveThemeSetting = ThemeManager.getEffectiveThemeSetting(
+        ThemeManager.currentGenderTheme,
+        ThemeManager.themePreferenceMale,
+        ThemeManager.themePreferenceFemale
     )
+    return when (effectiveThemeSetting) {
+        ThemeSetting.LIGHT -> false
+        ThemeSetting.DARK -> true
+        ThemeSetting.SYSTEM -> isSystemInDarkTheme()
+    }
 }

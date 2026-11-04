@@ -1,20 +1,58 @@
 package com.FreeRave.shredzilla.screens.exercises.composables
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.FreeRave.shredzilla.screens.settings.UnitSystem // Import UnitSystem
+import com.FreeRave.shredzilla.auth.composables.TextFormField
+import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.ui.glass.GlassBottomSheet
+import com.FreeRave.shredzilla.ui.glass.GlassCard
+import com.FreeRave.shredzilla.ui.glass.GlassFilterChip
+import com.FreeRave.shredzilla.ui.glass.GlassIconButton
+import com.FreeRave.shredzilla.ui.glass.GlassPrimaryButton
+import com.FreeRave.shredzilla.ui.theme.glass
+import com.FreeRave.shredzilla.utils.formatWeight
+import com.FreeRave.shredzilla.utils.formatWeightNumber
+import kotlin.math.abs
+import kotlinx.coroutines.launch
 
+private const val MIN_REPS = 1
+private val WeightQuickSteps = listOf(-5.0, -2.5, 2.5, 5.0)
+
+/**
+ * Body of the "record a set" sheet, shared by the library, list detail and exercise detail.
+ * Reps and weight use steppers so logging mid-workout needs no keyboard.
+ */
 @Composable
 fun RecordSetSheetContent(
     exerciseName: String,
@@ -22,185 +60,129 @@ fun RecordSetSheetContent(
     onCancel: () -> Unit,
     unitSystem: UnitSystem,
     modifier: Modifier = Modifier,
-    initialReps: Int = 1, // Default for new set
-    initialWeight: Double = 0.0, // Default for new set
-    initialNotes: String = "", // Default for new set
-    isEditing: Boolean = false // Flag to indicate if editing an existing set
+    initialReps: Int = MIN_REPS,
+    initialWeight: Double = 0.0,
+    initialNotes: String = "",
+    isEditing: Boolean = false
 ) {
-    var reps by remember(initialReps) { mutableStateOf(initialReps) }
-    var weight by remember(initialWeight) { mutableStateOf(initialWeight) }
+    var reps by remember(initialReps) { mutableIntStateOf(initialReps) }
+    var weight by remember(initialWeight) { mutableDoubleStateOf(initialWeight) }
     var notes by remember(initialNotes) { mutableStateOf(initialNotes) }
+    val palette = MaterialTheme.glass
 
-    Column(
-        modifier = modifier
-            .padding(16.dp)
-            .fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Drag handle (optional, ModalBottomSheet usually has one)
-        Box(
-            modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+            Text(
+                if (isEditing) "Edit set" else "Log a set",
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.contentMuted
+            )
+            Text(exerciseName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = palette.content)
+        }
+
+        StepperCard(
+            label = "Reps",
+            valueText = reps.toString(),
+            onMinus = { reps = (reps - 1).coerceAtLeast(MIN_REPS) },
+            onPlus = { reps++ }
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        StepperCard(
+            label = "Weight",
+            valueText = formatWeight(weight, unitSystem),
+            onMinus = { weight = (weight - 1).coerceAtLeast(0.0) },
+            onPlus = { weight += 1 }
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                WeightQuickSteps.forEach { step ->
+                    GlassFilterChip(
+                        text = "${if (step > 0) "+" else "−"}${formatWeightNumber(abs(step))}",
+                        selected = false,
+                        onClick = { weight = (weight + step).coerceAtLeast(0.0) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
 
-        Text(
-            "REPETITIONS & WEIGHT",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Reps Counter
-        CounterRow(
-            label = "rep",
-            currentValue = reps,
-            onIncrement = { reps++ },
-            onDecrement = { if (reps > 1) reps-- },
-            incrementValues = listOf(1),
-            decrementValues = listOf(1)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Weight Counter
-        val weightLabel = if (unitSystem == UnitSystem.METRIC) "kg" else "lbs"
-        CounterRow(
-            label = weightLabel, // Dynamic label
-            currentValue = weight,
-            onIncrement = { value -> weight += value },
-            onDecrement = { value -> if (weight - value >= 0) weight -= value else weight = 0.0 },
-            incrementValues = listOf(5.0, 1.0), // Order matters for button display
-            decrementValues = listOf(1.0, 5.0)  // Order matters for button display
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
+        TextFormField(
             value = notes,
             onValueChange = { notes = it },
-            label = { Text("Notes") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-            )
+            label = "Notes (optional)",
+            imeAction = ImeAction.Done,
+            leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null) }
         )
-        Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = {
-                onRecordSet(reps, weight, notes)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-        ) {
-            Text(if (isEditing) "Update Set" else "Record Set", color = MaterialTheme.colorScheme.onPrimary, fontSize = 16.sp)
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-         Button(
-            onClick = onCancel,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        ) {
-            Text("Cancel", color = MaterialTheme.colorScheme.onSecondaryContainer, fontSize = 16.sp)
+        GlassPrimaryButton(text = if (isEditing) "Update set" else "Record set", onClick = { onRecordSet(reps, weight, notes) })
+        TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("Cancel", color = palette.contentMuted)
         }
     }
 }
 
 @Composable
-private fun <T : Number> CounterRow(
+private fun StepperCard(
     label: String,
-    currentValue: T,
-    onIncrement: (T) -> Unit,
-    onDecrement: (T) -> Unit,
-    incrementValues: List<T>,
-    decrementValues: List<T>
+    valueText: String,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit,
+    extra: (@Composable () -> Unit)? = null
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-        // horizontalArrangement = Arrangement.SpaceBetween // Replaced by weights and spacers
-    ) {
-        // Increment buttons
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            incrementValues.forEachIndexed { index, value ->
-                CounterButton(text = "+ $value") { onIncrement(value) }
-                if (index < incrementValues.size - 1) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
+    val palette = MaterialTheme.glass
+    GlassCard(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = palette.contentMuted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            GlassIconButton(Icons.Filled.Remove, contentDescription = "Less $label", onClick = onMinus)
+            AnimatedContent(
+                targetState = valueText,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "${label}Value",
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) { shown ->
+                Text(shown, fontSize = 34.sp, fontWeight = FontWeight.Black, color = palette.content)
             }
+            GlassIconButton(Icons.Filled.Add, contentDescription = "More $label", onClick = onPlus)
         }
-
-        Spacer(modifier = Modifier.weight(0.5f)) // Spacer to push text and decrement buttons apart
-
-        // Value Text
-        val displayText = if (currentValue is Double) {
-            // Format double to 1 decimal place if it's not a whole number, else show as int
-            if (currentValue.rem(1) == 0.0) currentValue.toInt().toString() else String.format("%.1f", currentValue)
-        } else {
-            currentValue.toString()
-        }
-        Text(
-            text = "$label $displayText",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            modifier = Modifier.weight(1f) // Allow text to take space but also be constrained
-        )
-
-        Spacer(modifier = Modifier.weight(0.5f)) // Spacer to push text and decrement buttons apart
-
-        // Decrement buttons
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End
-        ) {
-            decrementValues.reversed().forEachIndexed { index, value ->
-                 if (index > 0) { // Add spacer before the second button onwards from the right
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                CounterButton(text = "- $value") { onDecrement(value) }
-            }
-        }
+        extra?.invoke()
     }
 }
 
+/**
+ * The full "log / edit a set" sheet, shown while [exerciseName] is non-null. Handles the slide-out
+ * animation itself and calls [onDismiss] once it's gone, so screens only track which exercise is open.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CounterButton(
-    text: String,
-    onClick: () -> Unit
+fun RecordSetSheet(
+    exerciseName: String?,
+    unitSystem: UnitSystem,
+    onRecordSet: (exerciseName: String, reps: Int, weight: Double, notes: String) -> Unit,
+    onDismiss: () -> Unit,
+    initialReps: Int = MIN_REPS,
+    initialWeight: Double = 0.0,
+    initialNotes: String = "",
+    isEditing: Boolean = false
 ) {
-    Button(
-        onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        ),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(text, fontWeight = FontWeight.Bold)
+    val name = exerciseName ?: return
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    fun close() {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    }
+
+    GlassBottomSheet(onDismiss = onDismiss, sheetState = sheetState) {
+        RecordSetSheetContent(
+            exerciseName = name,
+            unitSystem = unitSystem,
+            initialReps = initialReps,
+            initialWeight = initialWeight,
+            initialNotes = initialNotes,
+            isEditing = isEditing,
+            onRecordSet = { reps, weight, notes ->
+                onRecordSet(name, reps, weight, notes)
+                close()
+            },
+            onCancel = ::close
+        )
     }
 }

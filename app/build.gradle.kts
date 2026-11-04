@@ -62,6 +62,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -91,7 +92,10 @@ dependencies {
     implementation(libs.firebase.firestore.ktx) // Firebase Firestore
     implementation(libs.firebase.analytics.ktx) // Firebase Analytics
     implementation(libs.firebase.fcm)           // Firebase Cloud Messaging
-    implementation(libs.play.services.auth)     // Google Sign-In
+    implementation(libs.play.services.auth)              // Google Play Services transport for Credential Manager
+    implementation(libs.androidx.credentials)             // Credential Manager core
+    implementation(libs.androidx.credentials.play.services) // Credential Manager + Play Services bridge
+    implementation(libs.googleid)                         // GetGoogleIdOption
     implementation(libs.play.services.ads)      // Google AdMob
     implementation(libs.app.updater)
 

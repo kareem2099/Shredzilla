@@ -1,27 +1,15 @@
 package com.FreeRave.shredzilla.navigation
 
 import androidx.compose.material.icons.Icons
-// import androidx.compose.material.icons.automirrored.filled.ListAlt // No longer using ListAlt
-import androidx.compose.material.icons.filled.CalendarToday // Placeholder for "Today"
-import androidx.compose.material.icons.filled.FitnessCenter // Icon for "Sets"
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
-    object Sets : BottomNavItem( // Renamed from Exercises to Sets
-        route = AppRoutes.SETS, // Will need to define AppRoutes.SETS
-        label = "Sets",         // Renamed label
-        icon = Icons.Filled.FitnessCenter // Using FitnessCenter icon
-    )
-
-    object Today : BottomNavItem(
-        route = "today_screen", // Keeping this distinct for now, can be AppRoutes.TODAY if unified
-        label = "Today",
-        icon = Icons.Filled.CalendarToday
-    )
-    // Add other items like "Profile", "Settings" later if needed
+    object Sets : BottomNavItem(AppRoutes.SETS, "Sets", Icons.Filled.FitnessCenter)
+    object Today : BottomNavItem("today_screen", "Today", Icons.Filled.CalendarToday)
+    object Settings : BottomNavItem(AppRoutes.SETTINGS, "Settings", Icons.Filled.Settings)
 }
 
-val bottomNavItems = listOf(
-    BottomNavItem.Sets, // Updated to Sets
-    BottomNavItem.Today
-)
+val bottomNavItems = listOf(BottomNavItem.Sets, BottomNavItem.Today, BottomNavItem.Settings)
