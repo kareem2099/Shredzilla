@@ -1,313 +1,213 @@
 package com.FreeRave.shredzilla.screens.exercises
 
-// Grouped Standard Android/Compose imports
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlinx.coroutines.launch
-
-// Project-specific imports
-import androidx.navigation.NavHostController // Added for navigation
 import com.FreeRave.shredzilla.composables.RestTimerBar
 import com.FreeRave.shredzilla.models.ExerciseDisplayInfo
-import com.FreeRave.shredzilla.navigation.AppRoutes // Added for navigation routes
-import com.FreeRave.shredzilla.screens.exercises.composables.RecordSetSheetContent
+import com.FreeRave.shredzilla.screens.exercises.composables.RecordSetSheet
 import com.FreeRave.shredzilla.screens.exercises.composables.SwipableExerciseListItem
-import com.FreeRave.shredzilla.screens.settings.UnitSystem // Import UnitSystem
+import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.ui.glass.GlassCard
+import com.FreeRave.shredzilla.ui.glass.GlassDialog
+import com.FreeRave.shredzilla.ui.glass.GlassFab
+import com.FreeRave.shredzilla.ui.glass.GlassFilterChip
+import com.FreeRave.shredzilla.ui.glass.GlassIconBadge
+import com.FreeRave.shredzilla.ui.glass.GlassSearchField
+import com.FreeRave.shredzilla.ui.glass.GlassTopBar
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
+import com.FreeRave.shredzilla.ui.theme.glass
 
-enum class SortOption(val displayName: String) {
-    MOST_RECENTLY_DONE("Most Recently Done"),
-    ALPHABETICAL("Alphabetical")
+enum class SortOption(val label: String) {
+    MOST_RECENTLY_DONE("Recent"),
+    ALPHABETICAL("A–Z")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** The user's exercise library: search, sort, record a set, open details or delete. */
 @Composable
 fun ExercisesScreen(
-    exercisesDisplayInfo: List<ExerciseDisplayInfo>, // Now globally debounced and pre-filtered
+    exercisesDisplayInfo: List<ExerciseDisplayInfo>,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onNavigateToAddExercise: () -> Unit,
     onNavigateBack: () -> Unit,
     onDeleteExercise: (String) -> Unit,
-    onRecordExercise: (exerciseName: String, reps: Int, weight: Double, notes: String) -> Unit, // Updated signature
+    onRecordExercise: (exerciseName: String, reps: Int, weight: Double, notes: String) -> Unit,
     isTimerRunning: Boolean,
     timerRemainingSeconds: Int,
     timerTotalSeconds: Int,
     onCloseTimer: () -> Unit,
-    unitSystem: UnitSystem, // New parameter
-    navController: NavHostController // Added NavController
+    unitSystem: UnitSystem,
+    onOpenExercise: (exerciseName: String) -> Unit
 ) {
-    // State Hoisting: Search query is now managed safely in the ViewModel via StateFlow
-    // var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
-    var showSortMenu by remember { mutableStateOf(false) }
-    var selectedSortOption by remember { mutableStateOf<SortOption?>(null) }
+    var sortOption by rememberSaveable { mutableStateOf(SortOption.MOST_RECENTLY_DONE) }
+    var exerciseToRecord by remember { mutableStateOf<String?>(null) }
+    var exerciseToDelete by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showBottomSheet by remember { mutableStateOf(false) }
-    var selectedExerciseForRecord by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
-    var exerciseToDelete by remember { mutableStateOf<String?>(null) }
-
-    val displayedExercises = remember(selectedSortOption, exercisesDisplayInfo) {
-        derivedStateOf {
-            when (selectedSortOption) {
-                SortOption.ALPHABETICAL -> exercisesDisplayInfo.sortedBy { it.name }
-                SortOption.MOST_RECENTLY_DONE -> exercisesDisplayInfo // Already naturally ordered or handled centrally
-                null -> exercisesDisplayInfo
-            }
+    val sortedExercises = remember(sortOption, exercisesDisplayInfo) {
+        when (sortOption) {
+            // Never-done exercises sink to the bottom, then alphabetical among themselves
+            SortOption.MOST_RECENTLY_DONE -> exercisesDisplayInfo.sortedWith(
+                compareByDescending<ExerciseDisplayInfo> { it.lastPerformedMillis ?: Long.MIN_VALUE }.thenBy { it.name }
+            )
+            SortOption.ALPHABETICAL -> exercisesDisplayInfo.sortedBy { it.name.lowercase() }
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Exercises", color = MaterialTheme.colorScheme.onPrimary) },
-                actions = {
-                    IconButton(onClick = { showSortMenu = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "Sort options", tint = MaterialTheme.colorScheme.onPrimary)
-                    }
-                    SortOptionsMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false },
-                        onSortOptionSelected = { option ->
-                            selectedSortOption = option
-                            showSortMenu = false
-                        }
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            GlassTopBar(
+                title = "Exercise library",
+                eyebrow = "${exercisesDisplayInfo.size} exercises",
+                onBack = onNavigateBack
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAddExercise,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Exercise")
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-        ) {
             if (isTimerRunning) {
-                // Using fully qualified name as a test, though import should work
-                com.FreeRave.shredzilla.composables.RestTimerBar(
-                    remainingSeconds = timerRemainingSeconds,
-                    totalSeconds = timerTotalSeconds,
-                    onClose = onCloseTimer,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
+                RestTimerBar(remainingSeconds = timerRemainingSeconds, totalSeconds = timerTotalSeconds, onClose = onCloseTimer)
             }
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp)
-                    .fillMaxSize()
-            ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = { Text("Search", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search Icon", tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(50)),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (displayedExercises.value.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No exercises found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .pointerInput(Unit) {
-                                detectDragGestures { _, _ ->
-                                    focusManager.clearFocus()
-                                }
-                            },
-                        verticalArrangement = Arrangement.spacedBy(8.dp) // Added spacing
-                    ) {
-                        // 60 FPS Optimization: Explicitly declaring `key = { it.id }` forces Compose to memorize list allocations accurately during Debounced filtering!
-                        // `contentType` acts as a memory recycler, eliminating view recreation strain.
-                        items(
-                            items = displayedExercises.value,
-                            key = { it.id },
-                            contentType = { "ExerciseItem" }
-                        ) { exerciseInfo ->
-                            SwipableExerciseListItem(
-                                exerciseName = exerciseInfo.name,
-                                lastPerformed = exerciseInfo.lastPerformed,
-                                onDelete = { // Updated onDelete to show dialog
-                                    exerciseToDelete = exerciseInfo.name
-                                    showDeleteConfirmDialog = true
-                                },
-                                onRecord = {
-                                    selectedExerciseForRecord = exerciseInfo.name
-                                    showBottomSheet = true
-                                },
-                                onClick = {
-                                    val exerciseId = exerciseInfo.name.lowercase().replace(" ", "_")
-                                    navController.navigate(AppRoutes.EXERCISE_DETAIL.replace("{exerciseId}", exerciseId))
-                                },
-                                swipeEnabled = !isTimerRunning && !showBottomSheet && !showDeleteConfirmDialog
-                            )
-                        }
+            Column(modifier = Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GlassSearchField(query = searchQuery, onQueryChange = onSearchQueryChange, placeholder = "Search exercises")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SortOption.entries.forEach { option ->
+                        GlassFilterChip(text = option.label, selected = sortOption == option, onClick = { sortOption = option })
                     }
                 }
             }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Dragging the list dismisses the keyboard, like most search UIs
+                    .pointerInput(Unit) { detectDragGestures { _, _ -> focusManager.clearFocus() } },
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (sortedExercises.isEmpty()) {
+                    item { EmptyLibraryCard(isSearching = searchQuery.isNotBlank()) }
+                }
+                items(sortedExercises, key = { it.id }, contentType = { "exercise" }) { exercise ->
+                    SwipableExerciseListItem(
+                        exerciseName = exercise.name,
+                        lastPerformed = exercise.lastPerformed,
+                        onDelete = { exerciseToDelete = exercise.name },
+                        onRecord = { exerciseToRecord = exercise.name },
+                        onClick = { onOpenExercise(exercise.name) },
+                        modifier = Modifier.animateItem()
+                    )
+                }
+            }
         }
+        GlassFab(
+            icon = Icons.Filled.Add,
+            text = "Add exercise",
+            onClick = onNavigateToAddExercise,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(20.dp)
+        )
     }
 
-    if (showBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-        ) {
-            RecordSetSheetContent(
-                exerciseName = selectedExerciseForRecord ?: "Exercise",
-                onRecordSet = { reps, weight, notes ->
-                    selectedExerciseForRecord?.let { exerciseName ->
-                        onRecordExercise(exerciseName, reps, weight, notes)
-                    }
-                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                        if (!sheetState.isVisible) {
-                            showBottomSheet = false
-                        }
-                    }
-                },
-                onCancel = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                        if (!sheetState.isVisible) {
-                            showBottomSheet = false
-                        }
-                    }
-                },
-                unitSystem = unitSystem // Pass to bottom sheet
-            )
-        }
-    }
+    RecordSetSheet(
+        exerciseName = exerciseToRecord,
+        unitSystem = unitSystem,
+        onRecordSet = onRecordExercise,
+        onDismiss = { exerciseToRecord = null }
+    )
 
-    if (showDeleteConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmDialog = false },
-            title = { Text("Confirm Deletion") },
-            text = { Text("Are you sure you want to remove '${exerciseToDelete ?: "this exercise"}'?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        exerciseToDelete?.let { onDeleteExercise(it) }
-                        showDeleteConfirmDialog = false
-                        exerciseToDelete = null
-                    }
-                ) { Text("Yes, Remove") }
+    exerciseToDelete?.let { name ->
+        GlassDialog(
+            title = "Delete $name?",
+            message = "It's removed from the exercise library. Sets you've already logged stay in your history.",
+            confirmText = "Delete",
+            destructive = true,
+            icon = rememberVectorPainter(Icons.Filled.DeleteOutline),
+            onConfirm = {
+                onDeleteExercise(name)
+                exerciseToDelete = null
             },
-            dismissButton = {
-                TextButton(onClick = {
-                    showDeleteConfirmDialog = false
-                    exerciseToDelete = null
-                }) { Text("No") }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            onDismiss = { exerciseToDelete = null }
         )
     }
 }
 
 @Composable
-fun SortOptionsMenu(
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
-    onSortOptionSelected: (SortOption) -> Unit
-) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        SortOption.entries.forEach { option ->
-            DropdownMenuItem(
-                text = { Text(option.displayName, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                onClick = {
-                    onSortOptionSelected(option)
-                    onDismissRequest() // Ensure menu closes on item click
-                }
-            )
-        }
+private fun EmptyLibraryCard(isSearching: Boolean) {
+    val palette = MaterialTheme.glass
+    GlassCard(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        GlassIconBadge(
+            painter = rememberVectorPainter(Icons.Filled.SearchOff),
+            size = 56.dp,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+        Text(
+            text = if (isSearching) "No matches" else "Your library is empty",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = palette.content,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+        Text(
+            text = if (isSearching) "Try another name, or add it as a new exercise." else "Add the exercises you train to start logging sets.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = palette.contentMuted,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Preview
 @Composable
-fun ExercisesScreenPreview() {
-    val previewNavController = androidx.navigation.compose.rememberNavController() // Dummy for preview
-    ShredzillaTheme { // Removed darkTheme = true
+private fun ExercisesScreenPreview() {
+    ShredzillaTheme {
         ExercisesScreen(
             exercisesDisplayInfo = listOf(
-                ExerciseDisplayInfo(id = "bench", name = "Preview Bench", lastPerformed = "Today"),
-                ExerciseDisplayInfo(id = "squat", name = "Preview Squat", lastPerformed = "Yesterday"),
-                ExerciseDisplayInfo(id = "deadlift", name = "Preview Deadlift", lastPerformed = "3 days ago")
+                ExerciseDisplayInfo(id = "bench", name = "Bench Press", lastPerformed = "Today"),
+                ExerciseDisplayInfo(id = "squat", name = "Squat", lastPerformed = "Yesterday"),
+                ExerciseDisplayInfo(id = "deadlift", name = "Deadlift")
             ),
             searchQuery = "",
             onSearchQueryChange = {},
             onNavigateToAddExercise = {},
             onNavigateBack = {},
             onDeleteExercise = {},
-            onRecordExercise = { _, _, _, _ -> }, // Match new signature
+            onRecordExercise = { _, _, _, _ -> },
             isTimerRunning = true,
             timerRemainingSeconds = 30,
             timerTotalSeconds = 60,
             onCloseTimer = {},
-            unitSystem = UnitSystem.METRIC, // Add to preview
-            navController = previewNavController // Pass dummy NavController
+            unitSystem = UnitSystem.METRIC,
+            onOpenExercise = {}
         )
     }
 }

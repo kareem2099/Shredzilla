@@ -13,18 +13,29 @@ val Pink40 = Color(0xFF7D5260) // Used as LightAccentPink before
 
 val Black = Color(0xFF000000)
 val White = Color(0xFFFFFFFF)
-val TextFieldGreen = Color(0xFF2ECC71)
 
 // --- Male Theme Colors (Green Centric) ---
 // Light Male Theme
 val MaleLightPrimary = Color(0xFF006D3D) // Darker Green for primary elements
 val MaleLightOnPrimary = Color.White
-val MaleLightSecondary = Color(0xFF4CAF50) // Lighter Green for secondary
-val MaleLightOnSecondary = Color.Black
-val MaleLightBackground = Color(0xFFF0FFF0) // Very light green/mint white
-val MaleLightOnBackground = Color(0xFF00210F) // Very dark green for text
-val MaleLightSurface = Color(0xFFF0FFF0)
-val MaleLightOnSurface = Color(0xFF00210F)
+val MaleLightPrimaryContainer = Color(0xFFA6F2C1)
+val MaleLightOnPrimaryContainer = Color(0xFF00210F)
+val MaleLightSecondary = Color(0xFF2E7D52) // Rich Green for secondary
+val MaleLightOnSecondary = Color.White
+val MaleLightSecondaryContainer = Color(0xFFC8F5D9)
+val MaleLightOnSecondaryContainer = Color(0xFF062112)
+val MaleLightTertiary = Color(0xFF006A60)
+val MaleLightOnTertiary = Color.White
+val MaleLightTertiaryContainer = Color(0xFF9DF2E7)
+val MaleLightOnTertiaryContainer = Color(0xFF00201C)
+val MaleLightBackground = Color(0xFFF6FBF7) // Clean soft mint-white
+val MaleLightOnBackground = Color(0xFF111F17) // Very dark green for text
+val MaleLightSurface = Color(0xFFFFFFFF)
+val MaleLightOnSurface = Color(0xFF111F17)
+val MaleLightSurfaceVariant = Color(0xFFE3F0E8)
+val MaleLightOnSurfaceVariant = Color(0xFF3E5247)
+val MaleLightOutline = Color(0xFF6E8578)
+val MaleLightOutlineVariant = Color(0xFFC1D4C9)
 val MaleLightError = Color(0xFFB00020) // Standard Error for Light
 val MaleLightOnError = Color.White
 val MaleLightErrorContainer = Color(0xFFFCD8DF) // Example, adjust as needed
@@ -33,13 +44,25 @@ val MaleLightOnErrorContainer = Color(0xFF410E0B) // Example, adjust as needed
 
 // Dark Male Theme
 val MaleDarkPrimary = Color(0xFF50D892) // Bright Green for primary
-val MaleDarkOnPrimary = Color.Black
-val MaleDarkSecondary = Color(0xFF008748) // Medium Green for secondary
-val MaleDarkOnSecondary = Color.White
-val MaleDarkBackground = Color(0xFF001F10) // Very dark green/black
-val MaleDarkOnBackground = Color(0xFF9EF8C4) // Light green for text
-val MaleDarkSurface = Color(0xFF001F10)
-val MaleDarkOnSurface = Color(0xFF9EF8C4)
+val MaleDarkOnPrimary = Color(0xFF00391D)
+val MaleDarkPrimaryContainer = Color(0xFF00522C)
+val MaleDarkOnPrimaryContainer = Color(0xFF8BF6B8)
+val MaleDarkSecondary = Color(0xFF66CFA0) // Medium Mint Green for secondary
+val MaleDarkOnSecondary = Color(0xFF003820)
+val MaleDarkSecondaryContainer = Color(0xFF144D31)
+val MaleDarkOnSecondaryContainer = Color(0xFFA0F2C0)
+val MaleDarkTertiary = Color(0xFF64D8CB)
+val MaleDarkOnTertiary = Color(0xFF003732)
+val MaleDarkTertiaryContainer = Color(0xFF005049)
+val MaleDarkOnTertiaryContainer = Color(0xFF88F5E7)
+val MaleDarkBackground = Color(0xFF0A140F) // Deep emerald-tinted dark background
+val MaleDarkOnBackground = Color(0xFFE1F3E8) // Crisp light mint-white for text
+val MaleDarkSurface = Color(0xFF0F1D16)
+val MaleDarkOnSurface = Color(0xFFE1F3E8)
+val MaleDarkSurfaceVariant = Color(0xFF182C22)
+val MaleDarkOnSurfaceVariant = Color(0xFFB5CEC0)
+val MaleDarkOutline = Color(0xFF3A5747)
+val MaleDarkOutlineVariant = Color(0xFF23392D)
 val MaleDarkError = Color(0xFFCF6679) // Standard Error for Dark
 val MaleDarkOnError = Color.Black
 val MaleDarkErrorContainer = Color(0xFFB00020) // Example, adjust as needed
@@ -50,12 +73,24 @@ val MaleDarkOnErrorContainer = Color(0xFFFCD8DF) // Example, adjust as needed
 // Light Female Theme
 val FemaleLightPrimary = Color(0xFFC9007A) // Strong Pink/Magenta
 val FemaleLightOnPrimary = Color.White
-val FemaleLightSecondary = Color(0xFFE91E63) // Lighter Pink
+val FemaleLightPrimaryContainer = Color(0xFFFFD8E8)
+val FemaleLightOnPrimaryContainer = Color(0xFF3E0024)
+val FemaleLightSecondary = Color(0xFF9C3A6B) // Rose Pink
 val FemaleLightOnSecondary = Color.White
-val FemaleLightBackground = Color(0xFFFFF0F5) // Lavender Blush / Very light pink
-val FemaleLightOnBackground = Color(0xFF3E0024) // Dark Magenta/Purple for text
-val FemaleLightSurface = Color(0xFFFFF0F5)
-val FemaleLightOnSurface = Color(0xFF3E0024)
+val FemaleLightSecondaryContainer = Color(0xFFFFD9E7)
+val FemaleLightOnSecondaryContainer = Color(0xFF3A0724)
+val FemaleLightTertiary = Color(0xFF7B4397)
+val FemaleLightOnTertiary = Color.White
+val FemaleLightTertiaryContainer = Color(0xFFF3DAFF)
+val FemaleLightOnTertiaryContainer = Color(0xFF2E004E)
+val FemaleLightBackground = Color(0xFFFCF7F9) // Soft blush-white
+val FemaleLightOnBackground = Color(0xFF24131B) // Dark Magenta/Purple for text
+val FemaleLightSurface = Color(0xFFFFFFFF)
+val FemaleLightOnSurface = Color(0xFF24131B)
+val FemaleLightSurfaceVariant = Color(0xFFF5E3EC)
+val FemaleLightOnSurfaceVariant = Color(0xFF59404B)
+val FemaleLightOutline = Color(0xFF8C6E7C)
+val FemaleLightOutlineVariant = Color(0xFFDDC2CE)
 val FemaleLightError = Color(0xFFB00020) // Standard Error for Light (can be themed pinker if desired)
 val FemaleLightOnError = Color.White
 val FemaleLightErrorContainer = Color(0xFFFCD8DF)
@@ -64,70 +99,30 @@ val FemaleLightOnErrorContainer = Color(0xFF410E0B)
 
 // Dark Female Theme
 val FemaleDarkPrimary = Color(0xFFFF80AB) // Bright Pink (Pink80 was EFB8C8)
-val FemaleDarkOnPrimary = Color.Black
+val FemaleDarkOnPrimary = Color(0xFF560027)
+val FemaleDarkPrimaryContainer = Color(0xFF7B1445)
+val FemaleDarkOnPrimaryContainer = Color(0xFFFFD9E3)
 val FemaleDarkSecondary = Color(0xFFF48FB1) // Lighter Pink
-val FemaleDarkOnSecondary = Color.Black
-val FemaleDarkBackground = Color(0xFF300018) // Dark Magenta/Purple
-val FemaleDarkOnBackground = Color(0xFFFFD9E5) // Light Pink for text
-val FemaleDarkSurface = Color(0xFF300018)
-val FemaleDarkOnSurface = Color(0xFFFFD9E5)
+val FemaleDarkOnSecondary = Color(0xFF491529)
+val FemaleDarkSecondaryContainer = Color(0xFF632B3F)
+val FemaleDarkOnSecondaryContainer = Color(0xFFFFD9E5)
+val FemaleDarkTertiary = Color(0xFFD8B4F8)
+val FemaleDarkOnTertiary = Color(0xFF3B1D5E)
+val FemaleDarkTertiaryContainer = Color(0xFF533576)
+val FemaleDarkOnTertiaryContainer = Color(0xFFEFDBFF)
+val FemaleDarkBackground = Color(0xFF160B11) // Deep dark berry-black
+val FemaleDarkOnBackground = Color(0xFFF7E4EC) // Crisp light pink-white for text
+val FemaleDarkSurface = Color(0xFF20111A)
+val FemaleDarkOnSurface = Color(0xFFF7E4EC)
+val FemaleDarkSurfaceVariant = Color(0xFF311B28)
+val FemaleDarkOnSurfaceVariant = Color(0xFFDCC0CC)
+val FemaleDarkOutline = Color(0xFF634452)
+val FemaleDarkOutlineVariant = Color(0xFF422935)
 val FemaleDarkError = Color(0xFFCF6679) // Standard Error for Dark (can be themed pinker if desired)
 val FemaleDarkOnError = Color.Black
 val FemaleDarkErrorContainer = Color(0xFFB00020)
 val FemaleDarkOnErrorContainer = Color(0xFFFCD8DF)
 
-
-// Existing colors for reference or if needed as tertiary, etc.
-// val DarkBackground = Color(0xFF000000) // Black - Now part of specific themes
-// val DarkText = Color(0xFF00FF00)       // Green - Now part of specific themes
-// val LightBackground = Color(0xFFFFFFFF) // White - Now part of specific themes
-// val LightText = Color(0xFF006400)     // Dark Green - Now part of specific themes
-
-// Highlight colors for RestTimeScreen selections
-val MaleThemeHighlight = Color(0xFFFF4444) // Bright Red
-val FemaleThemeHighlight = Color(0xFFE91E63) // Vibrant Pink (using FemaleLightSecondary for consistency)
-
-// Specific colors for RestTimeOption titles/icons
-
-// -- Male Theme Option Colors --
-val MaleOption1RedLight = Color(0xFFD32F2F) // Darker Red for light theme
-val MaleOption1RedDark = Color(0xFFFF5252)  // Brighter Red for dark theme
-
-val MaleOption2OrangeLight = Color(0xFFF57C00) // Darker Orange for light
-val MaleOption2OrangeDark = Color(0xFFFFAB40)   // Brighter Orange for dark
-
-val MaleOption3GreenLight = Color(0xFF388E3C) // Darker Green for light
-val MaleOption3GreenDark = Color(0xFF66BB6A)  // Brighter Green for dark
-
-// -- Female Theme Option Colors --
-// (Example: Using shades of Pink, Purple, Teal for female options)
-val FemaleOption1PinkLight = Color(0xFFC2185B)   // Deep Pink for light
-val FemaleOption1PinkDark = Color(0xFFF48FB1)    // Lighter Pink for dark (matches FemaleDarkSecondary)
-
-val FemaleOption2PurpleLight = Color(0xFF7B1FA2) // Deep Purple for light
-val FemaleOption2PurpleDark = Color(0xFFCE93D8)  // Lighter Purple for dark
-
-val FemaleOption3TealLight = Color(0xFF00796B)   // Deep Teal for light
-val FemaleOption3TealDark = Color(0xFF4DB6AC)    // Lighter Teal for dark
-
-// Colors for DayPill in TodayScreen's horizontal week view
-val WorkoutDayBlueLight = Color(0xFF1976D2) // Standard Blue 700
-val WorkoutDayBlueDark = Color(0xFF64B5F6)  // Standard Blue 300
-val FemaleWorkoutDayPinkLight = Color(0xFFAD1457) // Pink 700 for female theme
-val FemaleWorkoutDayPinkDark = Color(0xFFF06292)   // Pink 300 for female theme
-
-val NoActivityDayGrayLight = Color(0xFFE0E0E0) // Gray 300
-val NoActivityDayGrayDark = Color(0xFF424242)   // Gray 700 (adjust alpha for card background)
-// For female theme, "no activity" can still be gray or a very desaturated version of a theme color.
-// Using grays for now for simplicity, can be themed further.
-val FemaleNoActivityDayGrayLight = NoActivityDayGrayLight
-val FemaleNoActivityDayGrayDark = NoActivityDayGrayDark
-
-// Today's date highlight (if no activity, otherwise WorkoutDay color takes precedence if today had activity)
-val TodayHighlightGreenLight = Color(0xFF388E3C) // Green 700
-val TodayHighlightGreenDark = Color(0xFF81C784)  // Green 300
-val FemaleTodayHighlightPinkLight = Color(0xFFD81B60) // Pink 600
-val FemaleTodayHighlightPinkDark = Color(0xFFF48FB1) // Pink 200 (matches FemaleDarkSecondary)
 
 // ── Auth Screen Colors ────────────────────────────────────────────────────────
 // Shared background gradient for Login & Register (dark purple → near-black)

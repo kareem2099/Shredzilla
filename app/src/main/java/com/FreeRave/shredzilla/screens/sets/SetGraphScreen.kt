@@ -2,301 +2,237 @@ package com.FreeRave.shredzilla.screens.sets
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.FreeRave.shredzilla.composables.ProgressChartCanvas
 import com.FreeRave.shredzilla.composables.RestTimerBar
 import com.FreeRave.shredzilla.models.UserExerciseList
+import com.FreeRave.shredzilla.ui.glass.GlassCard
+import com.FreeRave.shredzilla.ui.glass.GlassChip
+import com.FreeRave.shredzilla.ui.glass.GlassDefaults
+import com.FreeRave.shredzilla.ui.glass.GlassIconBadge
+import com.FreeRave.shredzilla.ui.glass.GlassTopBar
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.filled.ListAlt
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.material3.CircularProgressIndicator
+import com.FreeRave.shredzilla.ui.theme.glass
 import com.FreeRave.shredzilla.viewmodels.MainViewModel
+import java.util.Calendar
+import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Home of the Sets tab: progress chart, exercise library and the user's workout lists. */
 @Composable
 fun SetGraphScreen(
     analyticsGraphData: Map<String, List<MainViewModel.ChartDataPoint>>,
     isAnalyticsLoading: Boolean,
     exerciseCount: Int,
-    userExerciseLists: List<UserExerciseList>, // New parameter for user's lists
-    onNavigateToSettings: () -> Unit,
+    userExerciseLists: List<UserExerciseList>,
+    userName: String?,
     onNavigateToExerciseList: () -> Unit,
+    onOpenPrograms: () -> Unit,
+    recommendedProgramName: String?,
     onNavigateToCreateNewList: () -> Unit,
-    onNavigateToExerciseListDetail: (listId: String, listName: String) -> Unit, // New callback
+    onNavigateToExerciseListDetail: (listId: String, listName: String) -> Unit,
     isTimerRunning: Boolean,
     timerRemainingSeconds: Int,
     timerTotalSeconds: Int,
     onCloseTimer: () -> Unit
 ) {
-    // Add other navigation callbacks as needed, e.g., for settings or new list
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Shredzilla", color = MaterialTheme.colorScheme.onPrimary) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateToSettings) { // Use the new callback
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onPrimary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToCreateNewList,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Create New List")
-            }
-        },
-        content = { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .padding(paddingValues) // This padding is from the Scaffold (includes TopAppBar height)
-                    .fillMaxSize()
-            ) {
-                if (isTimerRunning) {
-                    RestTimerBar(
-                        remainingSeconds = timerRemainingSeconds,
-                        totalSeconds = timerTotalSeconds,
-                        onClose = onCloseTimer,
-                        // Modifier.padding(horizontal = 16.dp) // Already padded by Column's parent
-                    )
-                }
-                Column( // Inner column for the rest of the content with its own padding
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxSize()
-                ) {
-                    if (isAnalyticsLoading) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
-                    } else { // It's either empty or has data
-                        Text(
-                            "Overall Progress",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        
-                        val primaryExerciseId = analyticsGraphData.entries.maxByOrNull { it.value.size }?.key
-                        if (analyticsGraphData.isNotEmpty() && primaryExerciseId != null && analyticsGraphData[primaryExerciseId]!!.size > 1) {
-                            ProgressChartCanvas(
-                                dataPoints = analyticsGraphData[primaryExerciseId]!!, 
-                                modifier = Modifier.fillMaxWidth().height(150.dp).padding(vertical = 8.dp)
-                            )
-                        } else {
-                            Text("Complete more workouts to unlock your Progress Chart!", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                    SetGraphCard(
-                        count = exerciseCount.toString(),
-                        title = "Exercises",
-                        showExerciseIcon = true,
-                        onClick = onNavigateToExerciseList
-                    )
-                    // Display user-created lists
-                    if (userExerciseLists.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "Your Lists",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Reverting to basic items without key to see if it resolves compiler issue
-                            items(userExerciseLists) { exerciseList -> 
-                                SetGraphCard(
-                                    count = exerciseList.exerciseIds.size.toString(),
-                                    title = exerciseList.name,
-                                    showExerciseIcon = true, 
-                                    onClick = { onNavigateToExerciseListDetail(exerciseList.id, exerciseList.name) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    )
-}
+    // The exercise with the most data points makes the most meaningful trend line
+    val featured = remember(analyticsGraphData) {
+        analyticsGraphData.entries.maxByOrNull { it.value.size }?.takeIf { it.value.size > 1 }
+    }
 
-@Composable
-fun SetGraphCard(
-    modifier: Modifier = Modifier,
-    count: String? = null,
-    title: String,
-    showPlusIcon: Boolean = false,
-    showExerciseIcon: Boolean = false,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+    Column(modifier = Modifier.fillMaxSize()) {
+        GlassTopBar(
+            eyebrow = greeting(),
+            title = userName?.substringBefore(' ')?.takeIf { it.isNotBlank() } ?: "Shredzilla"
+        )
+        if (isTimerRunning) {
+            RestTimerBar(remainingSeconds = timerRemainingSeconds, totalSeconds = timerTotalSeconds, onClose = onCloseTimer)
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (count != null) {
-                    Text(
-                        text = count,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
+            item {
+                ProgressCard(
+                    exerciseName = featured?.key?.toDisplayName(),
+                    dataPoints = featured?.value,
+                    isLoading = isAnalyticsLoading
+                )
+            }
+            item {
+                NavigationCard(
+                    icon = Icons.Filled.FitnessCenter,
+                    title = "Exercise library",
+                    subtitle = "$exerciseCount ${if (exerciseCount == 1) "exercise" else "exercises"}",
+                    onClick = onNavigateToExerciseList
+                )
+            }
+            item {
+                NavigationCard(
+                    icon = Icons.Filled.AutoAwesome,
+                    title = "Start a program",
+                    subtitle = recommendedProgramName?.let { "Recommended for you: $it" } ?: "Ready-made splits for every level",
+                    onClick = onOpenPrograms
+                )
+            }
+            item { ListsHeader(onCreateList = onNavigateToCreateNewList) }
+            if (userExerciseLists.isEmpty()) {
+                item {
+                    NavigationCard(
+                        icon = Icons.Filled.Add,
+                        title = "Create your first list",
+                        subtitle = "Group exercises into a workout, like Push Day",
+                        onClick = onNavigateToCreateNewList
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
                 }
-                Text(
-                    text = title,
-                    color = if (title == "New List") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            if (showPlusIcon) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "New List",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            if (showExerciseIcon) {
-                Icon(
-                    imageVector = Icons.Filled.FitnessCenter,
-                    contentDescription = "Exercises",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-    }
-}
-
-// Pro-Tip: Advanced Canvas Drawing for dynamic Y-Axis bounds.
-// Mathematical clamping prevents outliers from aggressively compressing the graph.
-@Composable
-fun ProgressChartCanvas(dataPoints: List<MainViewModel.ChartDataPoint>, modifier: Modifier = Modifier) {
-    if (dataPoints.isEmpty() || dataPoints.size < 2) return
-    val primaryColor = MaterialTheme.colorScheme.primary
-
-    // Pro-Tip: Adding Gradient Fill for Premium Look
-    val gradientBrush = Brush.verticalGradient(
-        colors = listOf(
-            primaryColor.copy(alpha = 0.4f), 
-            Color.Transparent
-        )
-    )
-
-    // Dynamic Bounds Evaluation
-    val maxVolume = dataPoints.maxOf { it.totalVolume }.toFloat()
-    val minVolume = dataPoints.minOf { it.totalVolume }.toFloat()
-    
-    // Pro-Tip: Safe Division & Clamping
-    val volumeRange = if (maxVolume > minVolume) (maxVolume - minVolume) else 1f // Prevent division by zero entirely
-
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-        val pointSpacing = width / (dataPoints.size - 1).toFloat()
-
-        val path = Path()
-        val fillPath = Path() // New path for the gradient fill
-
-        dataPoints.forEachIndexed { index, point ->
-            val safeVolume = point.totalVolume.toFloat()
-            // If all values are equal, draw the straight line exactly centered at 0.5f
-            val normalizedY = if (maxVolume == minVolume) 0.5f else 1f - ((safeVolume - minVolume) / volumeRange)
-            val yPos = (normalizedY * height * 0.8f) + (height * 0.1f)
-            val xPos = index * pointSpacing
-
-            if (index == 0) {
-                path.moveTo(xPos, yPos)
-                fillPath.moveTo(xPos, yPos)
             } else {
-                path.lineTo(xPos, yPos)
-                fillPath.lineTo(xPos, yPos)
+                items(userExerciseLists, key = { it.id }) { list ->
+                    val count = list.exerciseIds.size
+                    NavigationCard(
+                        icon = Icons.AutoMirrored.Filled.ListAlt,
+                        title = list.name,
+                        subtitle = "$count ${if (count == 1) "exercise" else "exercises"}",
+                        onClick = { onNavigateToExerciseListDetail(list.id, list.name) }
+                    )
+                }
             }
         }
-
-        // Close the path to allow bottom contour gradient fill
-        fillPath.lineTo(width, height)
-        fillPath.lineTo(0f, height)
-        fillPath.close()
-
-        // Draw the gradient beneath the main stroke line
-        drawPath(
-            path = fillPath,
-            brush = gradientBrush
-        )
-
-        drawPath(
-            path = path,
-            color = primaryColor,
-            style = Stroke(width = 4.dp.toPx())
-        )
     }
 }
 
-@Preview(showBackground = true)
+private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> "Good morning"
+    in 12..16 -> "Good afternoon"
+    else -> "Good evening"
+}
+
+/** Analytics keys are exercise ids like "bench_press". */
+private fun String.toDisplayName() = split('_').joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
+
 @Composable
-fun SetGraphScreenPreview() {
+private fun ProgressCard(
+    exerciseName: String?,
+    dataPoints: List<MainViewModel.ChartDataPoint>?,
+    isLoading: Boolean
+) {
+    val palette = MaterialTheme.glass
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Progress", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = palette.content)
+                Text(
+                    text = exerciseName?.let { "$it · volume per session" } ?: "Your training volume over time",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.contentMuted
+                )
+            }
+            dataPoints?.let { trendPercent(it) }?.let { change ->
+                GlassChip(text = "${if (change >= 0) "+" else ""}$change%", highlighted = change >= 0)
+            }
+        }
+        when {
+            isLoading -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = palette.accent)
+            }
+            dataPoints != null -> ProgressChartCanvas(dataPoints, Modifier.fillMaxWidth().height(160.dp))
+            else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                GlassIconBadge(painter = rememberVectorPainter(Icons.Filled.Insights), size = 48.dp)
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    text = "Log a couple of workouts and your progress chart shows up here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = palette.contentMuted
+                )
+            }
+        }
+    }
+}
+
+/** Change from the first to the latest session, or null when there's no baseline. */
+private fun trendPercent(points: List<MainViewModel.ChartDataPoint>): Int? {
+    val first = points.first().totalVolume
+    if (first <= 0.0) return null
+    return ((points.last().totalVolume - first) / first * 100).roundToInt()
+}
+
+@Composable
+private fun ListsHeader(onCreateList: () -> Unit) {
+    val palette = MaterialTheme.glass
+    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "Your lists",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = palette.content,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onCreateList) {
+            Icon(Icons.Filled.Add, contentDescription = null, tint = palette.accent)
+            Spacer(Modifier.width(4.dp))
+            Text("New list", color = palette.accent, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun NavigationCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    val palette = MaterialTheme.glass
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(GlassDefaults.CardShape)
+            .clickable(onClick = onClick),
+        contentPadding = PaddingValues(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            GlassIconBadge(painter = rememberVectorPainter(icon), size = 52.dp)
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun SetGraphScreenPreview() {
     ShredzillaTheme {
         SetGraphScreen(
             analyticsGraphData = emptyMap(),
@@ -306,10 +242,12 @@ fun SetGraphScreenPreview() {
                 UserExerciseList("1", "Upper Body A", listOf("ex1", "ex2")),
                 UserExerciseList("2", "Leg Day", listOf("ex3", "ex4", "ex5"))
             ),
-            onNavigateToSettings = {}, 
+            userName = "Alex",
             onNavigateToExerciseList = {},
+            onOpenPrograms = {},
+            recommendedProgramName = "Push / Pull / Legs",
             onNavigateToCreateNewList = {},
-            onNavigateToExerciseListDetail = { _, _ -> }, // Add to preview
+            onNavigateToExerciseListDetail = { _, _ -> },
             isTimerRunning = true,
             timerRemainingSeconds = 45,
             timerTotalSeconds = 60,

@@ -1,16 +1,13 @@
 package com.FreeRave.shredzilla.data
 
+import com.FreeRave.shredzilla.utils.displayToKg
+import com.FreeRave.shredzilla.models.exerciseIdOf
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import com.FreeRave.shredzilla.models.ExerciseItem
-import com.FreeRave.shredzilla.models.ExerciseSetPerformance
-import com.FreeRave.shredzilla.models.initialGlobalExerciseList
 import com.FreeRave.shredzilla.models.UserExerciseList
 import com.FreeRave.shredzilla.models.RecordedSet
 import com.FreeRave.shredzilla.screens.settings.ThemeSetting
@@ -19,14 +16,36 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.FreeRave.shredzilla.models.exerciseIdOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
+import com.google.firebase.firestore.CollectionReference
+import com.FreeRave.shredzilla.utils.dateKeysBetween
+import com.FreeRave.shredzilla.onboarding.workoutFrequencyOptions
+import com.FreeRave.shredzilla.models.WorkoutProgram
+import com.FreeRave.shredzilla.models.TrainingLevel
+import com.FreeRave.shredzilla.models.initialGlobalExerciseList
 
 // Data classes that might be moved here or kept in a common 'models' package
 // For now, assuming UserExerciseList and RecordedSet are accessible (e.g. from navigation or models package)
+
+private const val FIRESTORE_BATCH_LIMIT = 500
+private const val DELETE_PARALLELISM = 20
 
 class UserDataManager(
     private val context: Context, // If needed for any utility functions
@@ -41,6 +60,7 @@ class UserDataManager(
     var userProfileImageLocalPath by mutableStateOf<String?>(null)
     var userUnitSystem by mutableStateOf(UnitSystem.METRIC)
     var userWorkoutReminderSetting by mutableStateOf("Never")
+    var userWeeklyGoalDays by mutableStateOf<Int?>(null)
     var themePreferenceMale by mutableStateOf(ThemeSetting.SYSTEM)
     var themePreferenceFemale by mutableStateOf(ThemeSetting.SYSTEM)
     var userExerciseLists by mutableStateOf<List<UserExerciseList>>(emptyList())
@@ -52,31 +72,88 @@ class UserDataManager(
     // --- Listener Management ---
     private val listeners = mutableListOf<com.google.firebase.firestore.ListenerRegistration>()
 
+    // Signed-in user whose library (users/{uid}/exercises) add/delete operate on
+    private var libraryUserId: String? = null
+
     fun clearAllListeners() {
         listeners.forEach { it.remove() }
         listeners.clear()
         todaySetsListener = null
+        libraryUserId = null
+        masterExerciseList.clear()
+    }
+
+    private fun userExercisesCollection(userId: String) =
+        db.collection("users").document(userId).collection("exercises")
+
+    /** Sign-out: stop listening and forget everything about the previous user, so the next one starts clean. */
+    fun resetForSignOut() {
+        clearAllListeners()
+        masterExerciseList.clear()
+        lastPerformedTimestampsMap.clear()
+        userRestTimePreference = "1min"
+        userProfileImageLocalPath = null
+        userUnitSystem = UnitSystem.METRIC
+        userWorkoutReminderSetting = "Never"
+        userWeeklyGoalDays = null
+        themePreferenceMale = ThemeSetting.SYSTEM
+        themePreferenceFemale = ThemeSetting.SYSTEM
+        userExerciseLists = emptyList()
+        todayRecordedSetsList = emptyList()
+        todayTotalReps = 0
+        todayTotalSets = 0
+        todayUniqueExercises = 0
+    }
+
+    /**
+     * Deletes everything stored under users/{uid}. Firestore doesn't delete subcollections with their
+     * parent, so each one is emptied explicitly. Old day documents were never written, so days are
+     * also enumerated by key from [accountCreatedMillis] to today to reach every logged set.
+     */
+    suspend fun deleteAllUserData(userId: String, accountCreatedMillis: Long) = coroutineScope {
+        val userDoc = db.collection("users").document(userId)
+        val days = userDoc.collection("dailyActivity")
+        val listedDayKeys = days.get().await().documents.map { it.id }
+        val allDayKeys = (listedDayKeys + dateKeysBetween(accountCreatedMillis, System.currentTimeMillis())).distinct()
+
+        allDayKeys.chunked(DELETE_PARALLELISM).forEach { chunk ->
+            chunk.map { key -> async { deleteCollection(days.document(key).collection("recordedSets")) } }.awaitAll()
+        }
+        listOf(days, userDoc.collection("exerciseLists"), userDoc.collection("exercises")).forEach { deleteCollection(it) }
+        userDoc.delete().await()
+    }
+
+    private suspend fun deleteCollection(collection: CollectionReference) {
+        val docs = collection.get().await().documents
+        docs.chunked(FIRESTORE_BATCH_LIMIT).forEach { chunk ->
+            db.runBatch { batch -> chunk.forEach { batch.delete(it.reference) } }.await()
+        }
     }
 
     // --- Firestore Listeners ---
     fun setupFirestoreListeners(currentUser: FirebaseUser?) {
-        // Listener for commonExercises
-        val commonExercisesRegistration = db.collection("commonExercises").orderBy("name")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null) {
-                    Log.w("Firestore", "Listen failed for commonExercises.", e)
-                    return@addSnapshotListener
-                }
-                val exercises = mutableListOf<String>()
-                snapshots?.forEach { doc ->
-                    doc.getString("name")?.let { exercises.add(it) }
-                }
-                masterExerciseList.clear()
-                masterExerciseList.addAll(exercises.distinct())
-            }
-        listeners.add(commonExercisesRegistration)
+        libraryUserId = currentUser?.uid
+        masterExerciseList.clear()
 
         currentUser?.uid?.let { userId ->
+            // Listener for the user's own exercise library
+            val exercisesRegistration = userExercisesCollection(userId).orderBy("name")
+                .addSnapshotListener { snapshots, e ->
+                    if (e != null) {
+                        Log.w("Firestore", "Listen failed for exercises of $userId.", e)
+                        return@addSnapshotListener
+                    }
+                    val exercises = mutableListOf<String>()
+                    snapshots?.forEach { doc ->
+                        doc.getString("name")?.let { exercises.add(it) }
+                    }
+                    masterExerciseList.clear()
+                    masterExerciseList.addAll(exercises.distinct())
+                }
+            listeners.add(exercisesRegistration)
+
+            ensureExerciseLibrarySeeded(userId)
+
             // Listener for user document
             val userDocRegistration = db.collection("users").document(userId)
                 .addSnapshotListener { userDocSnapshot, e ->
@@ -85,12 +162,6 @@ class UserDataManager(
                         return@addSnapshotListener
                     }
                     if (userDocSnapshot != null && userDocSnapshot.exists()) {
-                        @Suppress("UNCHECKED_CAST")
-                        (userDocSnapshot.get("initialExercises") as? List<String>)?.forEach {
-                            addExerciseToCommonExercises(
-                                it
-                            )
-                        }
                         userDocSnapshot.getString("restTimePreference")
                             ?.let { userRestTimePreference = it }
                         @Suppress("UNCHECKED_CAST")
@@ -107,6 +178,10 @@ class UserDataManager(
                                 Log.w("Firestore", "Invalid unit system: $it")
                             }
                         }
+                        // Stored as the onboarding label ("3 times per week"); its position is days - 1
+                        userWeeklyGoalDays = workoutFrequencyOptions
+                            .indexOf(userDocSnapshot.getString("weeklyGoalFrequency"))
+                            .takeIf { it >= 0 }?.plus(1)
                         userDocSnapshot.getString("workoutReminder")
                             ?.let { userWorkoutReminderSetting = it }
 
@@ -155,7 +230,9 @@ class UserDataManager(
                             UserExerciseList(
                                 id = doc.id,
                                 name = listName,
-                                exerciseIds = exIds
+                                exerciseIds = exIds,
+                                targetSetsMin = doc.getLong("targetSetsMin")?.toInt(),
+                                targetSetsMax = doc.getLong("targetSetsMax")?.toInt()
                             )
                         )
                     }
@@ -238,11 +315,13 @@ class UserDataManager(
 
     // --- Data Modification Functions ---
 
+    // Adds to the signed-in user's library (users/{uid}/exercises). The name is kept for existing call sites;
+    // the shared commonExercises collection is no longer written.
     fun addExerciseToCommonExercises(exerciseName: String) {
         val trimmedName = exerciseName.trim()
-        if (trimmedName.isNotBlank()) {
-            val exerciseDocId = trimmedName.lowercase().replace(" ", "_")
-            val exerciseDocRef = db.collection("commonExercises").document(exerciseDocId)
+        val userId = libraryUserId
+        if (trimmedName.isNotBlank() && userId != null) {
+            val exerciseDocRef = userExercisesCollection(userId).document(exerciseIdOf(trimmedName))
             db.runTransaction { transaction ->
                 val snapshot = transaction.get(exerciseDocRef)
                 if (!snapshot.exists()) {
@@ -253,30 +332,126 @@ class UserDataManager(
                 }
                 null
             }.addOnFailureListener { e ->
-                Log.w("Firestore", "Error adding exercise '$trimmedName' to commonExercises", e)
+                Log.w("Firestore", "Error adding exercise '$trimmedName' to library of $userId", e)
             }
+        } else if (userId == null) {
+            Log.w("Firestore", "No signed-in user; not adding exercise '$trimmedName'.")
         }
     }
 
+    // Deletes from the signed-in user's library only.
     fun deleteExerciseFromFirestore(exerciseName: String) {
         val trimmedName = exerciseName.trim()
-        if (trimmedName.isNotBlank()) {
-            val exerciseDocId = trimmedName.lowercase().replace(" ", "_")
-            db.collection("commonExercises").document(exerciseDocId).delete()
+        val userId = libraryUserId
+        if (trimmedName.isNotBlank() && userId != null) {
+            userExercisesCollection(userId).document(exerciseIdOf(trimmedName)).delete()
                 .addOnSuccessListener {
                     Log.d(
                         "Firestore",
-                        "Exercise $trimmedName deleted from commonExercises."
+                        "Exercise $trimmedName deleted from library of $userId."
                     )
                 }
                 .addOnFailureListener { e ->
                     Log.e(
                         "Firestore",
-                        "Error deleting $trimmedName from commonExercises",
+                        "Error deleting $trimmedName from library of $userId",
                         e
                     )
                 }
+        } else if (userId == null) {
+            Log.w("Firestore", "No signed-in user; not deleting exercise '$trimmedName'.")
         }
+    }
+
+    // --- Exercise library seeding / one-time migration ---
+
+    private val seedScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val seedAttemptedUserIds = mutableSetOf<String>()
+
+    /**
+     * Makes sure users/{uid}/exercises is populated once. New users get their onboarding picks
+     * (initialExercises); users from before the library was per-user get the exercises they actually
+     * use (lastPerformedTimestamps, exercise lists), falling back to the old shared commonExercises
+     * contents and finally the built-in list. Idempotent: skipped when the exerciseLibrarySeeded flag
+     * is set or the collection already has docs, and doc ids are deterministic (exerciseIdOf(name)).
+     */
+    private fun ensureExerciseLibrarySeeded(userId: String) {
+        if (!seedAttemptedUserIds.add(userId)) return
+        seedScope.launch {
+            try {
+                seedExerciseLibrary(userId)
+            } catch (e: Exception) {
+                // Allow a retry on the next listener setup (e.g. when we were offline).
+                seedAttemptedUserIds.remove(userId)
+                Log.w("Firestore", "Exercise library seeding failed for $userId", e)
+            }
+        }
+    }
+
+    private suspend fun seedExerciseLibrary(userId: String) {
+        val userDocRef = db.collection("users").document(userId)
+        // Server reads only: a cached "empty" result while offline must not trigger seeding.
+        val userDoc = userDocRef.get(Source.SERVER).await()
+        if (!userDoc.exists() || userDoc.getBoolean(LIBRARY_SEEDED_FIELD) == true) return
+
+        val markSeeded = mapOf(LIBRARY_SEEDED_FIELD to true)
+        if (!userExercisesCollection(userId).limit(1).get(Source.SERVER).await().isEmpty) {
+            userDocRef.set(markSeeded, SetOptions.merge()).await()
+            return
+        }
+
+        // id -> display name, from the built-in list (by both its id and exerciseIdOf(name)) and commonExercises
+        val knownNames = mutableMapOf<String, String>()
+        val commonExercises = try {
+            db.collection("commonExercises").get(Source.SERVER).await().documents
+        } catch (e: Exception) {
+            Log.w("Firestore", "Could not read commonExercises during migration", e)
+            emptyList()
+        }
+        commonExercises.forEach { doc ->
+            // Older builds wrote ids as names (e.g. "bench_press"); those carry no extra information.
+            doc.getString("name")?.trim()?.takeIf { it.isNotBlank() && it != doc.id }
+                ?.let { knownNames[doc.id] = it }
+        }
+        initialGlobalExerciseList.forEach { item ->
+            knownNames[item.id] = item.name
+            knownNames[exerciseIdOf(item.name)] = item.name
+        }
+        fun nameForId(id: String): String = knownNames[id]
+            ?: id.split('_').filter { it.isNotBlank() }
+                .joinToString(" ") { word -> word.replaceFirstChar { it.titlecase(Locale.ROOT) } }
+
+        val usedIds = linkedSetOf<String>()
+        @Suppress("UNCHECKED_CAST")
+        (userDoc.get("initialExercises") as? List<String>)?.let { usedIds.addAll(it) }
+        @Suppress("UNCHECKED_CAST")
+        (userDoc.get("lastPerformedTimestamps") as? Map<String, Any>)?.keys?.let { usedIds.addAll(it) }
+        userDocRef.collection("exerciseLists").get(Source.SERVER).await().documents.forEach { doc ->
+            @Suppress("UNCHECKED_CAST")
+            (doc.get("exerciseIds") as? List<String>)?.let { usedIds.addAll(it) }
+        }
+
+        var names = usedIds.filter { it.isNotBlank() }.map { nameForId(it) }
+        if (names.isEmpty()) names = commonExercises.map { nameForId(it.id) }
+        if (names.isEmpty()) names = initialGlobalExerciseList.map { it.name }
+        val namesById = names.map { it.trim() }.filter { it.isNotBlank() }
+            .associateBy { exerciseIdOf(it) }
+
+        // Batched writes are capped at 500 operations; the last chunk also sets the flag.
+        val entries = namesById.entries.toList()
+        val chunks = entries.chunked(400).ifEmpty { listOf(emptyList()) }
+        chunks.forEachIndexed { index, chunk ->
+            val batch = db.batch()
+            chunk.forEach { (docId, name) ->
+                batch.set(
+                    userExercisesCollection(userId).document(docId),
+                    mapOf("name" to name, "createdAt" to FieldValue.serverTimestamp())
+                )
+            }
+            if (index == chunks.lastIndex) batch.set(userDocRef, markSeeded, SetOptions.merge())
+            batch.commit().await()
+        }
+        Log.d("Firestore", "Seeded exercise library for $userId with ${entries.size} exercises.")
     }
 
     fun updateProfileImagePathInFirestore(newPath: String?, currentUser: FirebaseUser?) {
@@ -284,185 +459,72 @@ class UserDataManager(
         userProfileImageLocalPath = newPath
     }
 
+    private fun setsCollection(userId: String, dateKey: String) =
+        db.collection("users").document(userId)
+            .collection("dailyActivity").document(dateKey)
+            .collection("recordedSets")
+
+    /** [weightInput] is in the user's unit; it's stored in kg. [onSaved] fires once Firestore confirms. */
     fun recordSet(
         exerciseName: String,
         reps: Int,
         weightInput: Double,
         notes: String,
-        currentUser: FirebaseUser?
+        currentUser: FirebaseUser?,
+        onSaved: () -> Unit = {}
     ) {
-        val exId = exerciseName.lowercase().replace(" ", "_")
+        val userId = currentUser?.uid ?: return
+        val exId = exerciseIdOf(exerciseName)
         val ts = Timestamp.now()
-        val weightInKg = convertToStorageWeight(weightInput)
+        val userDocRef = db.collection("users").document(userId)
 
-        currentUser?.uid?.let { userId ->
-            val userDocRef = db.collection("users").document(userId)
-            userDocRef.update("lastPerformedTimestamps.$exId", ts)
-                .addOnSuccessListener { lastPerformedTimestampsMap[exId] = ts }
-                .addOnFailureListener {
-                    // If field doesn't exist, set it.
-                    userDocRef.set(
-                        mapOf("lastPerformedTimestamps" to mapOf(exId to ts)),
-                        SetOptions.merge()
-                    )
-                        .addOnSuccessListener { lastPerformedTimestampsMap[exId] = ts }
-                }
+        // Local first so "last done" updates instantly; merge creates the map field if it's missing
+        lastPerformedTimestampsMap[exId] = ts
+        userDocRef.set(mapOf("lastPerformedTimestamps" to mapOf(exId to ts)), SetOptions.merge())
 
-            val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(ts.toDate())
-            val setData = hashMapOf(
-                "exerciseName" to exerciseName,
-                "exerciseId" to exId,
-                "reps" to reps,
-                "weight" to weightInKg, // Always store in kg
-                "notes" to notes,
-                "timestamp" to ts
-            )
-
-            // Optimistic UI Update: Execute locally BEFORE the network request to guarantee 0ms latency.
-            val optimisticDocId = "pending_${java.util.UUID.randomUUID()}"
-            updateLocalExerciseSetInList(
-                exerciseName,
-                reps,
-                weightInput,
-                notes,
-                ts,
-                optimisticDocId
-            )
-
-            userDocRef.collection("dailyActivity").document(todayDate).collection("recordedSets")
-                .add(setData)
-                .addOnSuccessListener { documentReference ->
-                    // The set is already visible to the user. Firestore Native Offline Persistence handles the rest!
-                }
-                .addOnFailureListener { e ->
-                    Log.e("Firestore", "Error adding set to dailyActivity for $exerciseName", e)
-                }
-        }
+        val setData = hashMapOf(
+            "exerciseName" to exerciseName,
+            "exerciseId" to exId,
+            "reps" to reps,
+            "weight" to convertToStorageWeight(weightInput), // always kg
+            "notes" to notes,
+            "timestamp" to ts
+        )
+        val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(ts.toDate())
+        // The day document must exist too: Firestore can't list days that only have a subcollection
+        userDocRef.collection("dailyActivity").document(dateKey).set(mapOf("date" to dateKey), SetOptions.merge())
+        // Offline, Firestore keeps the write and syncs later; the today listener shows it immediately
+        setsCollection(userId, dateKey).add(setData)
+            .addOnSuccessListener { onSaved() }
+            .addOnFailureListener { e -> Log.e("Firestore", "Error recording set for $exerciseName", e) }
     }
 
-    private fun updateLocalExerciseSetInList(
-        exName: String,
+    fun deleteSet(dateKey: String, docId: String, currentUser: FirebaseUser?, onDone: () -> Unit = {}) {
+        val userId = currentUser?.uid ?: return
+        setsCollection(userId, dateKey).document(docId).delete()
+            .addOnSuccessListener { onDone() }
+            .addOnFailureListener { e -> Log.e("Firestore", "Error deleting set $docId", e) }
+    }
+
+    /** [weightInput] is in the user's unit; it's stored in kg. */
+    fun updateSet(
+        dateKey: String,
+        docId: String,
         reps: Int,
         weightInput: Double,
         notes: String,
-        ts: Timestamp,
-        firestoreDocId: String?
+        currentUser: FirebaseUser?,
+        onDone: () -> Unit = {}
     ) {
-        val exerciseIdForLocalUpdate = exName.lowercase().replace(" ", "_")
-        val exerciseToUpdate = initialGlobalExerciseList.find { it.id == exerciseIdForLocalUpdate }
-        exerciseToUpdate?.let { item ->
-            val newSetNumber = (item.recordedSets.maxOfOrNull { set -> set.setNumber } ?: 0) + 1
-            val newSetPerformance = ExerciseSetPerformance(
-                setNumber = newSetNumber,
-                reps = reps.toString(),
-                weight = weightInput.toString(), // Keep in user's unit for local display consistency
-                notes = notes,
-                timestamp = ts,
-                firestoreDocId = firestoreDocId
-            )
-            item.recordedSets.add(newSetPerformance)
-            Log.d(
-                "LocalUpdate",
-                "Locally added recordedSet for '$exName' with docID '$firestoreDocId'. New count: ${item.recordedSets.size}"
-            )
-        } ?: Log.w(
-            "LocalUpdate",
-            "Exercise '$exName' (ID: '$exerciseIdForLocalUpdate') not found in local initialGlobalExerciseList for adding set."
+        val userId = currentUser?.uid ?: return
+        val changes = mapOf(
+            "reps" to reps.toLong(),
+            "weight" to convertToStorageWeight(weightInput),
+            "notes" to notes
         )
-    }
-
-
-    fun deleteSet(exerciseName: String, firestoreDocId: String, currentUser: FirebaseUser?) {
-        currentUser?.uid?.let { userId ->
-            val exerciseItem = initialGlobalExerciseList.find { it.name == exerciseName }
-            val setToRemove =
-                exerciseItem?.recordedSets?.find { it.firestoreDocId == firestoreDocId }
-
-            if (setToRemove != null) {
-                val setDateStr =
-                    SimpleDateFormat("yyyy-MM-dd", Locale.US).format(setToRemove.timestamp.toDate())
-                val setDocRef = db.collection("users").document(userId)
-                    .collection("dailyActivity").document(setDateStr)
-                    .collection("recordedSets").document(firestoreDocId)
-
-                setDocRef.delete()
-                    .addOnSuccessListener {
-                        Log.d("Firestore", "Set $firestoreDocId deleted successfully.")
-                        exerciseItem.recordedSets.remove(setToRemove)
-                        Log.d(
-                            "LocalUpdate",
-                            "Set $firestoreDocId removed locally for $exerciseName."
-                        )
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e(
-                            "Firestore",
-                            "Error deleting set $firestoreDocId",
-                            e
-                        )
-                    }
-            } else {
-                Log.w(
-                    "DeleteSet",
-                    "Set with docID $firestoreDocId not found locally for $exerciseName."
-                )
-            }
-        }
-    }
-
-    fun updateSet(
-        exerciseName: String,
-        firestoreDocId: String,
-        newReps: Int,
-        newWeight: Double,
-        newNotes: String,
-        currentUser: FirebaseUser?
-    ) {
-        currentUser?.uid?.let { userId ->
-            val exerciseItem = initialGlobalExerciseList.find { it.name == exerciseName }
-            val setToUpdate =
-                exerciseItem?.recordedSets?.find { it.firestoreDocId == firestoreDocId }
-
-            if (setToUpdate != null) {
-                val setDateStr =
-                    SimpleDateFormat("yyyy-MM-dd", Locale.US).format(setToUpdate.timestamp.toDate())
-                val setDocRef = db.collection("users").document(userId)
-                    .collection("dailyActivity").document(setDateStr)
-                    .collection("recordedSets").document(firestoreDocId)
-
-                val weightInKgForUpdate = convertToStorageWeight(newWeight)
-                val updatedSetData = mapOf( // Use mapOf for type safety with update
-                    "reps" to newReps.toLong(), // Firestore expects Long for integer numbers
-                    "weight" to weightInKgForUpdate,
-                    "notes" to newNotes
-                    // timestamp, exerciseName, exerciseId are not changed on update
-                )
-
-                setDocRef.update(updatedSetData)
-                    .addOnSuccessListener {
-                        Log.d("Firestore", "Set $firestoreDocId updated successfully.")
-                        val index = exerciseItem.recordedSets.indexOf(setToUpdate)
-                        if (index != -1) {
-                            exerciseItem.recordedSets[index] = setToUpdate.copy(
-                                reps = newReps.toString(),
-                                weight = newWeight.toString(), // Keep in user's unit for local display
-                                notes = newNotes
-                            )
-                            Log.d(
-                                "LocalUpdate",
-                                "Set $firestoreDocId updated locally for $exerciseName."
-                            )
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e(
-                            "Firestore",
-                            "Error updating set $firestoreDocId",
-                            e
-                        )
-                    }
-            }
-        }
+        setsCollection(userId, dateKey).document(docId).update(changes)
+            .addOnSuccessListener { onDone() }
+            .addOnFailureListener { e -> Log.e("Firestore", "Error updating set $docId", e) }
     }
 
     // DRY Helper for settings updates
@@ -473,13 +535,7 @@ class UserDataManager(
     }
 
     // DRY Helper for unit conversion
-    fun convertToStorageWeight(displayWeight: Double): Double {
-        return if (userUnitSystem == UnitSystem.IMPERIAL) displayWeight * 0.45359237 else displayWeight
-    }
-
-    fun convertToDisplayWeight(storageWeightKg: Double): Double {
-        return if (userUnitSystem == UnitSystem.IMPERIAL) storageWeightKg / 0.45359237 else storageWeightKg
-    }
+    private fun convertToStorageWeight(displayWeight: Double): Double = displayToKg(displayWeight, userUnitSystem)
 
     fun createNewList(listName: String, selectedExerciseIds: List<String>, currentUser: FirebaseUser?) {
         val newListData = hashMapOf(
@@ -494,10 +550,40 @@ class UserDataManager(
         }
     }
 
+    /**
+     * Adds a ready-made split: every exercise goes into the library (existing ones are left alone)
+     * and each day becomes a list like "PPL · Push" carrying the level's suggested sets.
+     */
+    fun addProgram(program: WorkoutProgram, level: TrainingLevel, currentUser: FirebaseUser?) {
+        val userId = currentUser?.uid ?: return
+        program.allExercises.forEach(::addExerciseToCommonExercises)
+        val lists = db.collection("users").document(userId).collection("exerciseLists")
+        val now = System.currentTimeMillis()
+        program.days.forEachIndexed { index, day ->
+            val listData = hashMapOf(
+                "name" to "${program.shortName} · ${day.name}",
+                "exerciseIds" to day.exercises.map(::exerciseIdOf),
+                "targetSetsMin" to level.minSets,
+                "targetSetsMax" to level.maxSets,
+                // Lists are shown newest first, so give earlier days a later time to keep A before B
+                "createdAt" to Timestamp(Date(now + (program.days.size - index)))
+            )
+            lists.add(listData).addOnFailureListener { e -> Log.e("Firestore", "Error adding ${program.name} list", e) }
+        }
+    }
+
     fun removeExerciseFromList(listId: String, exerciseIdToDelete: String, currentUser: FirebaseUser?) {
         currentUser?.uid?.let { userId ->
             db.collection("users").document(userId).collection("exerciseLists").document(listId)
                 .update("exerciseIds", FieldValue.arrayRemove(exerciseIdToDelete))
+        }
+    }
+
+    /** Deletes the list only; the exercises stay in the library and logged sets are untouched. */
+    fun deleteList(listId: String, currentUser: FirebaseUser?) {
+        currentUser?.uid?.let { userId ->
+            db.collection("users").document(userId).collection("exerciseLists").document(listId).delete()
+                .addOnFailureListener { e -> Log.e("Firestore", "Error deleting list $listId", e) }
         }
     }
 
@@ -510,5 +596,9 @@ class UserDataManager(
             db.collection("users").document(userId).collection("exerciseLists").document(listId)
                 .set(listUpdateData, SetOptions.merge())
         }
+    }
+
+    companion object {
+        private const val LIBRARY_SEEDED_FIELD = "exerciseLibrarySeeded"
     }
 }

@@ -1,126 +1,98 @@
 package com.FreeRave.shredzilla.screens.settings
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.NotificationsActive // Or a more fitting icon
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.FreeRave.shredzilla.ui.glass.GlassCard
+import com.FreeRave.shredzilla.ui.glass.GlassIconBadge
+import com.FreeRave.shredzilla.ui.glass.GlassNumberRow
+import com.FreeRave.shredzilla.ui.glass.GlassSubpageScaffold
+import com.FreeRave.shredzilla.ui.glass.glassSwitchColors
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
+import com.FreeRave.shredzilla.ui.theme.glass
 
-// TODO: Import a way to save/load this preference
+private const val REMINDER_OFF = "Never"
+private val ReminderDayRange = 1..8
+private const val DEFAULT_REMINDER_DAYS = 3
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Stored as "Never" or "N day(s) inactive" in Firestore ("workoutReminder"). */
+private fun parseReminderDays(setting: String): Int? = setting.substringBefore(' ').toIntOrNull()
+private fun reminderSettingOf(days: Int?): String =
+    days?.let { "$it ${if (it == 1) "day" else "days"} inactive" } ?: REMINDER_OFF
+
+/** Inactivity reminder: on/off plus how many idle days before the nudge. Saves on every change. */
 @Composable
 fun WorkoutRemindersScreen(
     onNavigateBack: () -> Unit,
-    // TODO: Pass current preference and a lambda to save it
-    currentReminderSetting: String, // e.g., "Never", "1 day inactive"
+    currentReminderSetting: String,
     onReminderSettingChange: (String) -> Unit
 ) {
-    var selectedOption by remember { mutableStateOf(currentReminderSetting) }
-    var showDropdownMenu by remember { mutableStateOf(false) }
+    var days by remember { mutableStateOf(parseReminderDays(currentReminderSetting)) }
+    val palette = MaterialTheme.glass
 
-    val reminderOptions = listOf(
-        "Never", 
-        "1 day inactive", 
-        "2 days inactive", 
-        "3 days inactive", 
-        "4 days inactive", 
-        "5 days inactive", 
-        "6 days inactive", 
-        "7 days inactive",
-        "8 days inactive" 
-    )
+    fun update(newDays: Int?) {
+        days = newDays
+        onReminderSettingChange(reminderSettingOf(newDays))
+    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Workout Reminders") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+    GlassSubpageScaffold(title = "Workout reminders", eyebrow = "Settings", onBack = onNavigateBack) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                GlassIconBadge(painter = rememberVectorPainter(Icons.Filled.NotificationsActive), size = 48.dp)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Remind me", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
+                    Text(
+                        "Muscle growth slows after long breaks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = palette.contentMuted
+                    )
                 }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Filled.NotificationsActive, // Placeholder icon
-                contentDescription = "Workout Reminder Icon",
-                modifier = Modifier.size(80.dp).padding(bottom = 16.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = "Muscle growth slows down after long periods of inactivity.",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            Text(
-                text = "Get a notification when it's been too long since your last workout.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text("Remind after:", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            ExposedDropdownMenuBox(
-                expanded = showDropdownMenu,
-                onExpandedChange = { showDropdownMenu = !showDropdownMenu }
-            ) {
-                OutlinedTextField(
-                    value = selectedOption,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Inactive Period") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showDropdownMenu) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                Switch(
+                    checked = days != null,
+                    onCheckedChange = { on -> update(if (on) DEFAULT_REMINDER_DAYS else null) },
+                    colors = glassSwitchColors()
                 )
-                ExposedDropdownMenu(
-                    expanded = showDropdownMenu,
-                    onDismissRequest = { showDropdownMenu = false }
-                ) {
-                    reminderOptions.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option) },
-                            onClick = {
-                                selectedOption = option
-                                onReminderSettingChange(option)
-                                showDropdownMenu = false
-                            }
-                        )
-                    }
+            }
+            AnimatedVisibility(visible = days != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        text = "After ${days ?: DEFAULT_REMINDER_DAYS} ${if (days == 1) "day" else "days"} without a workout",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = palette.content
+                    )
+                    GlassNumberRow(range = ReminderDayRange, selected = days, onSelect = ::update)
                 }
             }
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview
 @Composable
-fun WorkoutRemindersScreenPreview() {
+private fun WorkoutRemindersScreenPreview() {
     ShredzillaTheme {
-        WorkoutRemindersScreen(
-            onNavigateBack = {},
-            currentReminderSetting = "3 days inactive",
-            onReminderSettingChange = {}
-        )
+        WorkoutRemindersScreen(onNavigateBack = {}, currentReminderSetting = "3 days inactive", onReminderSettingChange = {})
     }
 }

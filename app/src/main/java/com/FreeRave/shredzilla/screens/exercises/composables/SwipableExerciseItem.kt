@@ -1,159 +1,152 @@
 package com.FreeRave.shredzilla.screens.exercises.composables
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.clickable // Added for onClick
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit // Or a more specific record icon like FitnessCenter
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalLayoutDirection // Import LocalLayoutDirection
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.LayoutDirection // Import LayoutDirection
+import com.FreeRave.shredzilla.ui.glass.GlassChip
+import com.FreeRave.shredzilla.ui.glass.GlassDefaults
+import com.FreeRave.shredzilla.ui.glass.glassSurface
+import com.FreeRave.shredzilla.ui.theme.glass
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Exercise row: tap to open, "+" to record a set, swipe towards the start to delete.
+ * The swipe only *asks* to delete: the card springs back and [onDelete] shows the confirmation,
+ * so cancelling never leaves an invisible row behind.
+ */
 @Composable
 fun SwipableExerciseListItem(
     exerciseName: String,
     lastPerformed: String?,
     onDelete: () -> Unit,
     onRecord: () -> Unit,
-    onClick: () -> Unit, // New parameter for item click
-    swipeEnabled: Boolean = true, // New parameter to control swipeability
-    modifier: Modifier = Modifier
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    swipeEnabled: Boolean = true,
+    progress: String? = null,
+    progressDone: Boolean = false
 ) {
-    val currentItemName by rememberUpdatedState(exerciseName)
-    val currentLastPerformed by rememberUpdatedState(lastPerformed)
-    val layoutDirection = LocalLayoutDirection.current
-
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { dismissValue ->
-            if (!swipeEnabled) return@rememberSwipeToDismissBoxState false
-
-            val isRtl = layoutDirection == LayoutDirection.Rtl
-
-            when (dismissValue) {
-                SwipeToDismissBoxValue.EndToStart -> { // Physical swipe from right-to-left in LTR, or left-to-right in RTL
-                    if (isRtl) onDelete() else onRecord()
-                    if (isRtl) true else false // Dismiss for delete, not for record
-                }
-                SwipeToDismissBoxValue.StartToEnd -> { // Physical swipe from left-to-right in LTR, or right-to-left in RTL
-                    if (isRtl) onRecord() else onDelete()
-                    if (isRtl) false else true // Dismiss for delete, not for record
-                }
-                SwipeToDismissBoxValue.Settled -> false
-            }
+    val dismissState = rememberSwipeToDismissBoxState()
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+            onDelete()
+            dismissState.reset()
         }
-    )
+    }
 
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier.padding(vertical = 1.dp),
-        enableDismissFromStartToEnd = swipeEnabled, // Controlled by new parameter
-        enableDismissFromEndToStart = swipeEnabled, // Controlled by new parameter
+        modifier = modifier,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = swipeEnabled,
         backgroundContent = {
-            DismissBehindContent(dismissState = dismissState)
+            // Only paint the red layer mid-swipe, otherwise it bleeds through the translucent card
+            if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) DeleteBackground()
         }
     ) {
-        ExerciseCardItem(
-            name = currentItemName,
-            lastPerformed = currentLastPerformed,
-            modifier = Modifier.clickable(onClick = onClick, enabled = swipeEnabled) // Apply onClick here, consider if swipeEnabled should also control clickability
+        ExerciseCard(
+            name = exerciseName,
+            lastPerformed = lastPerformed,
+            progress = progress,
+            progressDone = progressDone,
+            onClick = onClick,
+            onRecord = onRecord
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DismissBehindContent(dismissState: SwipeToDismissBoxState) {
-    val physicalDirection = dismissState.dismissDirection // This is StartToEnd or EndToStart based on physical swipe start
-    val layoutDirection = LocalLayoutDirection.current
-    val isRtl = layoutDirection == LayoutDirection.Rtl
-
-    // Determine logical action based on physical swipe and layout direction
-    val isRemoveAction = (physicalDirection == SwipeToDismissBoxValue.StartToEnd && !isRtl) || (physicalDirection == SwipeToDismissBoxValue.EndToStart && isRtl)
-    val isRecordAction = (physicalDirection == SwipeToDismissBoxValue.EndToStart && !isRtl) || (physicalDirection == SwipeToDismissBoxValue.StartToEnd && isRtl)
-
-    val color = when {
-        isRemoveAction -> MaterialTheme.colorScheme.errorContainer
-        isRecordAction -> MaterialTheme.colorScheme.primaryContainer
-        else -> Color.Transparent
-    }
-    val icon = when {
-        isRemoveAction -> Icons.Filled.Delete
-        isRecordAction -> Icons.Filled.Edit
-        else -> null
-    }
-    val text = when {
-        isRemoveAction -> "Remove"
-        isRecordAction -> "Record"
-        else -> ""
-    }
-    val textColor = when {
-        isRemoveAction -> MaterialTheme.colorScheme.onErrorContainer
-        isRecordAction -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> Color.Transparent
-    }
-    // Alignment of the icon and text within the background
-    val alignment = when (physicalDirection) { // Align based on the physical edge revealed
-        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-        else -> Alignment.Center
-    }
-
+private fun DeleteBackground() {
+    val palette = MaterialTheme.glass
     Box(
-        Modifier
+        contentAlignment = Alignment.CenterEnd,
+        modifier = Modifier
             .fillMaxSize()
-            .background(color)
-            .padding(horizontal = 20.dp),
-        contentAlignment = alignment
+            .clip(GlassDefaults.CardShape)
+            .background(palette.error.copy(alpha = 0.25f))
+            .padding(horizontal = 24.dp)
     ) {
-        if (icon != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = text, tint = textColor)
-                Spacer(Modifier.width(8.dp))
-                Text(text, color = textColor, fontWeight = FontWeight.Bold)
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Delete", color = palette.error, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = palette.error)
         }
     }
 }
 
-// This is the original ExerciseItem, renamed to avoid conflict if ExercisesScreen still has one.
-// It will be the content of the SwipeToDismissBox.
 @Composable
-fun ExerciseCardItem(name: String, lastPerformed: String?, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+private fun ExerciseCard(
+    name: String,
+    lastPerformed: String?,
+    progress: String?,
+    progressDone: Boolean,
+    onClick: () -> Unit,
+    onRecord: () -> Unit
+) {
+    val palette = MaterialTheme.glass
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassSurface(palette, GlassDefaults.CardShape)
+            .clickable(onClick = onClick)
+            .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = palette.content,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = lastPerformed?.let { "Last done ${it.replaceFirstChar(Char::lowercase)}" } ?: "Not done yet",
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.contentMuted
+            )
+        }
+        if (progress != null) {
+            GlassChip(text = progress, highlighted = progressDone)
+            Spacer(Modifier.width(10.dp))
+        }
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(palette.accentGradient))
+                .clickable(role = Role.Button, onClick = onRecord)
         ) {
-            Column(modifier = Modifier.weight(1f)) { // Use a column to stack name and lastPerformed
-                Text(text = name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (lastPerformed != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = lastPerformed,
-                        style = MaterialTheme.typography.labelSmall, // Smaller text for the date
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            // You could add other icons or indicators on the right if needed in the future
+            Icon(Icons.Filled.Add, contentDescription = "Record a set of $name", tint = palette.onAccent)
         }
     }
 }

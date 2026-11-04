@@ -1,123 +1,58 @@
 package com.FreeRave.shredzilla.screens.settings
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import com.FreeRave.shredzilla.ui.glass.GlassFootnote
+import com.FreeRave.shredzilla.ui.glass.GlassOptionCard
+import com.FreeRave.shredzilla.ui.glass.GlassSubpageScaffold
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 
-enum class ThemeSetting(val displayName: String) {
-    LIGHT("Light"),
-    DARK("Dark"),
-    SYSTEM("System Default")
+/** Stored by [name] in Firestore ("themePreferenceMale"/"themePreferenceFemale"), so keep names stable. */
+enum class ThemeSetting(val displayName: String, val description: String, val icon: ImageVector) {
+    LIGHT("Light", "Bright glass, easy in daylight", Icons.Filled.LightMode),
+    DARK("Dark", "Deep glass, easy on the eyes", Icons.Filled.DarkMode),
+    SYSTEM("System default", "Follow your phone's setting", Icons.Filled.BrightnessAuto)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Theme picker; applies instantly so the user sees the result while choosing. */
 @Composable
 fun ThemeSettingsScreen(
     onNavigateBack: () -> Unit,
     currentThemeSetting: ThemeSetting,
     onThemeSettingChange: (ThemeSetting) -> Unit
 ) {
-    var selectedOption by remember { mutableStateOf(currentThemeSetting) }
+    var selected by remember { mutableStateOf(currentThemeSetting) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("App Theme") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-                // No Save button, selection is instant
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            ThemeSettingOptionRow(
-                text = ThemeSetting.LIGHT.displayName,
-                selected = selectedOption == ThemeSetting.LIGHT,
+    GlassSubpageScaffold(title = "Theme", eyebrow = "Settings", onBack = onNavigateBack) {
+        ThemeSetting.entries.forEach { setting ->
+            GlassOptionCard(
+                icon = setting.icon,
+                title = setting.displayName,
+                subtitle = setting.description,
+                selected = selected == setting,
                 onClick = {
-                    selectedOption = ThemeSetting.LIGHT
-                    onThemeSettingChange(ThemeSetting.LIGHT)
-                }
-            )
-            HorizontalDivider()
-            ThemeSettingOptionRow(
-                text = ThemeSetting.DARK.displayName,
-                selected = selectedOption == ThemeSetting.DARK,
-                onClick = {
-                    selectedOption = ThemeSetting.DARK
-                    onThemeSettingChange(ThemeSetting.DARK)
-                }
-            )
-            HorizontalDivider()
-            ThemeSettingOptionRow(
-                text = ThemeSetting.SYSTEM.displayName,
-                selected = selectedOption == ThemeSetting.SYSTEM,
-                onClick = {
-                    selectedOption = ThemeSetting.SYSTEM
-                    onThemeSettingChange(ThemeSetting.SYSTEM)
+                    selected = setting
+                    onThemeSettingChange(setting)
                 }
             )
         }
+        GlassFootnote("Your colours always follow the profile you picked during setup.")
     }
 }
 
+@Preview
 @Composable
-private fun ThemeSettingOptionRow(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = onClick
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-@Preview(showBackground = true, name = "Theme Settings - System")
-@Composable
-fun ThemeSettingsScreenPreviewSystem() {
+private fun ThemeSettingsScreenPreview() {
     ShredzillaTheme {
-        ThemeSettingsScreen(
-            onNavigateBack = {},
-            currentThemeSetting = ThemeSetting.SYSTEM,
-            onThemeSettingChange = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Theme Settings - Dark")
-@Composable
-fun ThemeSettingsScreenPreviewDark() {
-    ShredzillaTheme { // Removed darkTheme = true
-        ThemeSettingsScreen(
-            onNavigateBack = {},
-            currentThemeSetting = ThemeSetting.DARK,
-            onThemeSettingChange = {}
-        )
+        ThemeSettingsScreen(onNavigateBack = {}, currentThemeSetting = ThemeSetting.SYSTEM, onThemeSettingChange = {})
     }
 }

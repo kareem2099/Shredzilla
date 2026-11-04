@@ -1,53 +1,64 @@
 package com.FreeRave.shredzilla.screens.account
 
-import androidx.compose.foundation.Image
+import android.Manifest
+import android.net.Uri
+import android.os.Build
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import android.Manifest 
-import android.util.Log 
-import android.widget.Toast 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import android.graphics.BitmapFactory 
-import android.net.Uri 
-import androidx.activity.compose.rememberLauncherForActivityResult 
-import androidx.activity.result.contract.ActivityResultContracts 
-import com.FreeRave.shredzilla.R
-import com.FreeRave.shredzilla.navigation.AppRoutes
+import com.FreeRave.shredzilla.screens.account.composables.ProfileAvatar
+import com.FreeRave.shredzilla.ui.glass.GlassBottomSheet
+import com.FreeRave.shredzilla.ui.glass.GlassDialog
+import com.FreeRave.shredzilla.ui.glass.GlassSettingsGroup
+import com.FreeRave.shredzilla.ui.glass.GlassSettingsRow
+import com.FreeRave.shredzilla.ui.glass.GlassSubpageScaffold
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
-import com.FreeRave.shredzilla.utils.ImageStorageUtils 
-import kotlinx.coroutines.launch
-import com.FreeRave.shredzilla.screens.account.composables.AccountActionItem
-import com.FreeRave.shredzilla.screens.account.composables.ImageSourceSheetContent 
-import com.FreeRave.shredzilla.screens.account.composables.MainImageOptionsSheetContent
+import com.FreeRave.shredzilla.ui.theme.glass
+import com.FreeRave.shredzilla.utils.ImageStorageUtils
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 
+private enum class AccountDialog { NONE, REMOVE_PHOTO, DELETE_ACCOUNT }
 
-internal enum class ProfileImageSheetStage {
-    NONE, 
-    MAIN_OPTIONS, 
-    SOURCE_SELECTION 
-}
-
+/** Profile (name + photo), sign out and account deletion. The photo is stored on-device only. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountScreen(
@@ -56,255 +67,217 @@ fun AccountScreen(
     onNavigateToUpdateUsername: () -> Unit,
     userEmail: String?,
     userName: String?,
-    profileImageUrl: String?, 
+    profileImageUrl: String?,
     isDeletingAccount: Boolean,
     onUpdateProfileImagePathInFirestore: (String?) -> Unit,
     onDeleteAccount: (() -> Unit, (Exception) -> Unit) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var currentSheetStage by remember { mutableStateOf(ProfileImageSheetStage.NONE) }
-    
-    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
-    var showRemoveImageConfirmDialog by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val palette = MaterialTheme.glass
+    var imagePath by remember { mutableStateOf(profileImageUrl) }
+    var showPhotoSheet by remember { mutableStateOf(false) }
+    var dialog by remember { mutableStateOf(AccountDialog.NONE) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
-    var localProfileImagePath by remember { mutableStateOf<String?>(profileImageUrl) }
-    var tempImageUriForCamera by remember { mutableStateOf<Uri?>(null) }
+    LaunchedEffect(profileImageUrl) { imagePath = profileImageUrl }
 
-    LaunchedEffect(profileImageUrl) {
-        localProfileImagePath = profileImageUrl
-    }
+    fun toast(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val savedPath = ImageStorageUtils.saveImageToInternalStorage(context, uri, "user_profile_gallery_")
-            if (savedPath != null) {
-                localProfileImagePath?.let { ImageStorageUtils.deleteImageFromInternalStorage(it) }
-                localProfileImagePath = savedPath
-                onUpdateProfileImagePathInFirestore(savedPath)
-                Toast.makeText(context, "Profile image updated.", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(context, "Failed to save image from gallery.", Toast.LENGTH_SHORT).show()
-            }
+    // Gallery and camera both end here: copy into app storage, drop the old file, sync the path
+    fun usePhoto(uri: Uri, filePrefix: String) {
+        val savedPath = ImageStorageUtils.saveImageToInternalStorage(context, uri, filePrefix)
+        if (savedPath == null) {
+            toast("Couldn't save that photo.")
+            return
         }
-        scope.launch { sheetState.hide() }.invokeOnCompletion { currentSheetStage = ProfileImageSheetStage.NONE }
+        imagePath?.let(ImageStorageUtils::deleteImageFromInternalStorage)
+        imagePath = savedPath
+        onUpdateProfileImagePathInFirestore(savedPath)
+        toast("Profile photo updated.")
     }
 
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success: Boolean ->
-        if (success) {
-            tempImageUriForCamera?.let { uri ->
-                val savedPath = ImageStorageUtils.saveImageToInternalStorage(context, uri, "user_profile_camera_")
-                 if (savedPath != null) {
-                    localProfileImagePath?.let { ImageStorageUtils.deleteImageFromInternalStorage(it) }
-                    localProfileImagePath = savedPath
-                    onUpdateProfileImagePathInFirestore(savedPath)
-                    Toast.makeText(context, "Profile image updated.", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Failed to save image from camera.", Toast.LENGTH_SHORT).show()
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { usePhoto(it, "user_profile_gallery_") }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val uri = pendingCameraUri
+        pendingCameraUri = null
+        if (success && uri != null) usePhoto(uri, "user_profile_camera_")
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) return@rememberLauncherForActivityResult toast("Camera permission denied.")
+        val photoFile = ImageStorageUtils.createImageFile(context, "user_profile_camera_")
+            ?: return@rememberLauncherForActivityResult toast("Couldn't create a file for the photo.")
+        ImageStorageUtils.getUriForFile(context, photoFile).also {
+            pendingCameraUri = it
+            cameraLauncher.launch(it)
+        }
+    }
+    val galleryPermission =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_IMAGES
+        else Manifest.permission.READ_EXTERNAL_STORAGE
+    val galleryPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) galleryLauncher.launch("image/*") else toast("Photo access denied.")
+    }
+
+    GlassSubpageScaffold(title = "Account", eyebrow = "Settings", onBack = onNavigateBack) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(modifier = Modifier.clickable(role = Role.Button) { showPhotoSheet = true }) {
+                ProfileAvatar(imagePath = imagePath, name = userName ?: userEmail, size = 108.dp)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = (-2).dp, y = (-2).dp)
+                        .size(34.dp)
+                        .background(palette.accent, CircleShape)
+                ) {
+                    Icon(Icons.Filled.CameraAlt, contentDescription = "Change photo", tint = palette.onAccent, modifier = Modifier.size(18.dp))
                 }
             }
-        } else {
-             Toast.makeText(context, "Failed to capture image.", Toast.LENGTH_SHORT).show()
-        }
-        tempImageUriForCamera = null 
-        scope.launch { sheetState.hide() }.invokeOnCompletion { currentSheetStage = ProfileImageSheetStage.NONE }
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            val photoFile = ImageStorageUtils.createImageFile(context, "user_profile_camera_")
-            if (photoFile != null) {
-                tempImageUriForCamera = ImageStorageUtils.getUriForFile(context, photoFile)
-                tempImageUriForCamera?.let { cameraLauncher.launch(it) }
-            } else {
-                Toast.makeText(context, "Could not create file for photo.", Toast.LENGTH_SHORT).show()
-                scope.launch { sheetState.hide() }.invokeOnCompletion { currentSheetStage = ProfileImageSheetStage.NONE }
+            Text(
+                text = userName?.takeIf { it.isNotBlank() } ?: "Set your name",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = palette.content,
+                modifier = Modifier.offset(y = 8.dp)
+            )
+            if (userEmail != null) {
+                Text(userEmail, style = MaterialTheme.typography.bodyMedium, color = palette.contentMuted, modifier = Modifier.offset(y = 8.dp))
             }
-        } else {
-            Toast.makeText(context, "Camera permission denied.", Toast.LENGTH_SHORT).show()
-            scope.launch { sheetState.hide() }.invokeOnCompletion { currentSheetStage = ProfileImageSheetStage.NONE }
         }
-    }
 
-    val galleryPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_IMAGES
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
-    }
-    val galleryPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            galleryLauncher.launch("image/*")
-        } else {
-            Toast.makeText(context, "Storage permission denied.", Toast.LENGTH_SHORT).show()
-            scope.launch { sheetState.hide() }.invokeOnCompletion { currentSheetStage = ProfileImageSheetStage.NONE }
+        GlassSettingsGroup(title = "Profile") {
+            GlassSettingsRow(
+                icon = Icons.Filled.Person,
+                title = "Name",
+                value = userName?.takeIf { it.isNotBlank() } ?: "Not set",
+                onClick = onNavigateToUpdateUsername
+            )
+            GlassSettingsRow(icon = Icons.Filled.PhotoCamera, title = "Profile photo", onClick = { showPhotoSheet = true })
         }
-    }
-    
-    val painter = localProfileImagePath?.let { path ->
-        ImageStorageUtils.loadImageFromPath(path)?.asImageBitmap()?.let {
-            androidx.compose.ui.graphics.painter.BitmapPainter(it)
-        }
-    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Account") },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
+        GlassSettingsGroup(title = "Session") {
+            GlassSettingsRow(icon = Icons.AutoMirrored.Filled.Logout, title = "Sign out", onClick = onSignOut, showChevron = false)
+        }
+
+        GlassSettingsGroup(title = "Danger zone") {
+            GlassSettingsRow(
+                icon = Icons.Filled.DeleteForever,
+                title = "Delete account",
+                subtitle = "Permanently removes your account and data",
+                tint = palette.error,
+                onClick = { dialog = AccountDialog.DELETE_ACCOUNT },
+                showChevron = false
             )
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier.padding(paddingValues).fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // ... (rest of the UI: Image, Text for username/email, Cards for actions) ...
-            // This part remains the same as before
-            Spacer(modifier = Modifier.height(16.dp))
-            if (painter != null && localProfileImagePath != null) {
-                Image(painter = painter, contentDescription = "Profile Image", modifier = Modifier.size(100.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-            } else {
-                Image(painter = painterResource(id = R.drawable.icon), contentDescription = "Profile Image", modifier = Modifier.size(100.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = userName ?: "Username not set", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(text = userEmail ?: "email@example.com", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f))) {
-                AccountActionItem(text = "Update Username", icon = if (userName.isNullOrEmpty() || userName == "Username not set") Icons.Filled.Info else null, onClick = onNavigateToUpdateUsername)
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                AccountActionItem(text = "Update Profile Image", icon = null) { currentSheetStage = ProfileImageSheetStage.MAIN_OPTIONS }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f))) {
-                AccountActionItem(text = "Delete Account", icon = null, textColor = MaterialTheme.colorScheme.error) { showDeleteConfirmDialog = true }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-                AccountActionItem(text = "Sign Out", icon = null, textColor = MaterialTheme.colorScheme.primary, onClick = onSignOut)
-            }
-        }
     }
 
-    if (currentSheetStage != ProfileImageSheetStage.NONE) {
-        ModalBottomSheet(
-            onDismissRequest = { currentSheetStage = ProfileImageSheetStage.NONE },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-        ) {
-            when (currentSheetStage) {
-                ProfileImageSheetStage.MAIN_OPTIONS -> {
-                    MainImageOptionsSheetContent(
-                        onChoosePictureClick = { currentSheetStage = ProfileImageSheetStage.SOURCE_SELECTION },
-                        onRemovePictureClick = { 
-                            scope.launch { sheetState.hide() }.invokeOnCompletion { 
-                                currentSheetStage = ProfileImageSheetStage.NONE 
-                                showRemoveImageConfirmDialog = true
-                            }
-                        },
-                        onCancelClick = { scope.launch { sheetState.hide() }.invokeOnCompletion { currentSheetStage = ProfileImageSheetStage.NONE } },
-                        showRemoveOption = localProfileImagePath != null
-                    )
+    if (showPhotoSheet) {
+        GlassBottomSheet(title = "Profile photo", onDismiss = { showPhotoSheet = false }) {
+            GlassSettingsRow(
+                icon = Icons.Filled.PhotoCamera,
+                title = "Take photo",
+                showChevron = false,
+                onClick = {
+                    showPhotoSheet = false
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 }
-                ProfileImageSheetStage.SOURCE_SELECTION -> {
-                    ImageSourceSheetContent(
-                        onTakePhotoClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
-                        onChooseFromGalleryClick = { galleryPermissionLauncher.launch(galleryPermission) },
-                        onRemovePictureClick = {}, // This is now handled by MainImageOptionsSheetContent
-                        onCancelClick = { currentSheetStage = ProfileImageSheetStage.MAIN_OPTIONS }, // Go back to main options
-                        showRemoveOption = false // Remove option is in MainImageOptionsSheetContent
-                    )
+            )
+            GlassSettingsRow(
+                icon = Icons.Filled.PhotoLibrary,
+                title = "Choose from gallery",
+                showChevron = false,
+                onClick = {
+                    showPhotoSheet = false
+                    galleryPermissionLauncher.launch(galleryPermission)
                 }
-                ProfileImageSheetStage.NONE -> {} // Should not happen if showProfileImageSheet is true
-            }
-        }
-    }
-    
-    if (showRemoveImageConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showRemoveImageConfirmDialog = false },
-            title = { Text("Remove Picture") },
-            text = { Text("Are you sure you want to remove your profile picture?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    localProfileImagePath?.let { path ->
-                        ImageStorageUtils.deleteImageFromInternalStorage(path)
-                        onUpdateProfileImagePathInFirestore(null)
-                        Toast.makeText(context, "Profile image removed.", Toast.LENGTH_SHORT).show()
-                    }
-                    localProfileImagePath = null
-                    showRemoveImageConfirmDialog = false
-                }) { Text("Yes, Remove") }
-            },
-            dismissButton = { TextButton(onClick = { showRemoveImageConfirmDialog = false }) { Text("Cancel") } }
-        )
-    }
-
-    if (showDeleteConfirmDialog) {
-        // ... (Delete Account AlertDialog remains the same) ...
-        AlertDialog(
-            onDismissRequest = { if (!isDeletingAccount) showDeleteConfirmDialog = false },
-            title = { Text("Delete Account") },
-            text = { Text("Are you sure you want to permanently delete your account? This action cannot be undone.") },
-            confirmButton = {
-                TextButton(
+            )
+            if (imagePath != null) {
+                GlassSettingsRow(
+                    icon = Icons.Filled.DeleteOutline,
+                    title = "Remove photo",
+                    tint = palette.error,
+                    showChevron = false,
                     onClick = {
-                        onDeleteAccount(
-                            { // onSuccess
-                                Toast.makeText(context, "Account deleted successfully.", Toast.LENGTH_SHORT).show()
-                                showDeleteConfirmDialog = false
-                                onSignOut()
-                            },
-                            { e -> // onError
-                                Toast.makeText(context, "Error deleting account: ${e.message}", Toast.LENGTH_LONG).show()
-                                Log.e("AccountScreen", "Error deleting account", e)
-                                if (e is com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException) {
-                                    Toast.makeText(context, "Please sign out and sign back in to delete your account.", Toast.LENGTH_LONG).show()
-                                }
-                                showDeleteConfirmDialog = false
-                            }
-                        )
-                    },
-                    enabled = !isDeletingAccount
-                ) {
-                    if (isDeletingAccount) { CircularProgressIndicator(modifier = Modifier.size(20.dp)) } 
-                    else { Text("Yes, Delete", color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            dismissButton = { TextButton(onClick = { if (!isDeletingAccount) showDeleteConfirmDialog = false }) { Text("Cancel") } }
-        )
+                        showPhotoSheet = false
+                        dialog = AccountDialog.REMOVE_PHOTO
+                    }
+                )
+            }
+        }
     }
 
-    if (isDeletingAccount) {
+    when (dialog) {
+        AccountDialog.REMOVE_PHOTO -> GlassDialog(
+            title = "Remove photo?",
+            message = "Your profile will show your initial instead.",
+            confirmText = "Remove",
+            destructive = true,
+            icon = rememberVectorPainter(Icons.Filled.DeleteOutline),
+            onConfirm = {
+                imagePath?.let(ImageStorageUtils::deleteImageFromInternalStorage)
+                imagePath = null
+                onUpdateProfileImagePathInFirestore(null)
+                dialog = AccountDialog.NONE
+                toast("Profile photo removed.")
+            },
+            onDismiss = { dialog = AccountDialog.NONE }
+        )
+        AccountDialog.DELETE_ACCOUNT -> GlassDialog(
+            title = "Delete account?",
+            message = "This permanently deletes your account and workout history. It can't be undone.",
+            confirmText = "Delete forever",
+            destructive = true,
+            confirmLoading = isDeletingAccount,
+            icon = rememberVectorPainter(Icons.Filled.DeleteForever),
+            onConfirm = {
+                onDeleteAccount(
+                    {
+                        toast("Account deleted.")
+                        dialog = AccountDialog.NONE
+                        onSignOut()
+                    },
+                    { e ->
+                        Log.e("AccountScreen", "Error deleting account", e)
+                        toast(
+                            if (e is FirebaseAuthRecentLoginRequiredException) "For security, sign out and back in, then try again."
+                            else "Couldn't delete account: ${e.message}"
+                        )
+                        dialog = AccountDialog.NONE
+                    }
+                )
+            },
+            onDismiss = { dialog = AccountDialog.NONE }
+        )
+        AccountDialog.NONE -> Unit
+    }
+
+    if (isDeletingAccount && dialog == AccountDialog.NONE) {
         Box(
-            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(enabled = false, onClick = {}),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(enabled = false, onClick = {}),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = palette.accent)
         }
     }
 }
 
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview
 @Composable
-fun AccountScreenDarkPreview() {
-    ShredzillaTheme { // Removed darkTheme = true
-        AccountScreen(onNavigateBack = {}, onSignOut = {}, onNavigateToUpdateUsername = {}, userEmail = "kareem209907@gmail.com", userName = "Kareem Ehab", profileImageUrl = null, isDeletingAccount = false, onUpdateProfileImagePathInFirestore = {}, onDeleteAccount = { _, _ -> })
-    }
-}
-
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_NO)
-@Composable
-fun AccountScreenLightPreview() {
-    ShredzillaTheme { // Removed darkTheme = false
-        AccountScreen(onNavigateBack = {}, onSignOut = {}, onNavigateToUpdateUsername = {}, userEmail = "kareem209907@gmail.com", userName = null, profileImageUrl = null, isDeletingAccount = false, onUpdateProfileImagePathInFirestore = {}, onDeleteAccount = { _, _ -> })
+private fun AccountScreenPreview() {
+    ShredzillaTheme {
+        AccountScreen(
+            onNavigateBack = {}, onSignOut = {}, onNavigateToUpdateUsername = {},
+            userEmail = "alex@example.com", userName = "Alex Doe", profileImageUrl = null,
+            isDeletingAccount = false, onUpdateProfileImagePathInFirestore = {}, onDeleteAccount = { _, _ -> }
+        )
     }
 }

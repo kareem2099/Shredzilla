@@ -38,3 +38,6 @@ Thumbs.db
 .firebase/
 .firebaserc
 
+# Documentation/Articles
+Articles/
+.claude-screens/

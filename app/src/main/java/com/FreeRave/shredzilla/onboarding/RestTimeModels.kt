@@ -6,15 +6,18 @@ import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.ui.graphics.vector.ImageVector
 
+/** A rest-time preset. [id] is what gets stored in Firestore ("restTimePreference"), so keep it stable. */
 data class RestOption(
     val id: String,
-    val title: String,
+    val duration: String,
+    val goal: String,
     val description: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val isPopular: Boolean = false
 )
 
 val restOptions = listOf(
-    RestOption("1min", "minute 1", "More sets, less joint stress\nQuick Workouts", Icons.Filled.LocalFireDepartment),
-    RestOption("2min", "minute 2", "Get toned/bigger\nBuild Muscle", Icons.Filled.FitnessCenter),
-    RestOption("5min", "minute 5", "Maximize muscular power\nIncrease Strength", Icons.Filled.Timer)
+    RestOption("1min", "1 min", "Quick workouts", "More sets, less joint stress", Icons.Filled.LocalFireDepartment),
+    RestOption("2min", "2 min", "Build muscle", "Get toned and bigger", Icons.Filled.FitnessCenter, isPopular = true),
+    RestOption("5min", "5 min", "Increase strength", "Maximise muscular power", Icons.Filled.Timer)
 )

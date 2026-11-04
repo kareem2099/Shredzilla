@@ -1,485 +1,298 @@
 package com.FreeRave.shredzilla.screens.today
 
-
-
 import androidx.compose.foundation.clickable
-
-import androidx.compose.foundation.layout.*
-
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-
 import androidx.compose.foundation.lazy.LazyRow
-
 import androidx.compose.foundation.lazy.items
-
-import androidx.compose.foundation.lazy.itemsIndexed
-
-import androidx.compose.foundation.shape.RoundedCornerShape
-
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-
-import androidx.compose.material.icons.filled.CalendarToday
-
-import androidx.compose.material3.*
-
-import androidx.compose.runtime.*
-
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-
 import androidx.compose.ui.Modifier
-
-import androidx.compose.ui.graphics.Color
-
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
-
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-
 import androidx.compose.ui.unit.dp
-
-import androidx.compose.ui.unit.sp
-
-import androidx.compose.ui.window.Dialog
-
-import androidx.compose.ui.window.DialogProperties
-
-import androidx.navigation.NavHostController
-
 import com.FreeRave.shredzilla.models.RecordedSet
-
-import com.FreeRave.shredzilla.screens.calendar.FullScreenCalendarScreen
-
+import com.FreeRave.shredzilla.screens.calendar.CalendarSheet
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
-
+import com.FreeRave.shredzilla.ui.glass.GlassCard
+import com.FreeRave.shredzilla.ui.glass.GlassChip
+import com.FreeRave.shredzilla.ui.glass.GlassDefaults
+import com.FreeRave.shredzilla.ui.glass.GlassIconBadge
+import com.FreeRave.shredzilla.ui.glass.GlassIconButton
+import com.FreeRave.shredzilla.ui.glass.GlassStatTile
+import com.FreeRave.shredzilla.ui.glass.GlassTopBar
+import com.FreeRave.shredzilla.ui.glass.glassSurface
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
-
+import com.FreeRave.shredzilla.ui.theme.glass
+import com.FreeRave.shredzilla.utils.formatStoredWeight
+import com.FreeRave.shredzilla.utils.daysOfMonth
+import com.FreeRave.shredzilla.utils.startOfDay
 import com.google.firebase.Timestamp
-
 import java.text.SimpleDateFormat
-
-import java.util.*
-
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToLong
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
-
-
-
-
-private fun formatDateAsRelative(selectedDate: Date): String {
-
-    val today = Calendar.getInstance()
-
-    val selectedCal = Calendar.getInstance().apply { time = selectedDate }
-
-
-
-    today.set(Calendar.HOUR_OF_DAY, 0); today.set(Calendar.MINUTE, 0); today.set(Calendar.SECOND, 0); today.set(Calendar.MILLISECOND, 0)
-
-    selectedCal.set(Calendar.HOUR_OF_DAY, 0); selectedCal.set(Calendar.MINUTE, 0); selectedCal.set(Calendar.SECOND, 0); selectedCal.set(Calendar.MILLISECOND, 0)
-
-
-
-    val diffInMillis = selectedCal.timeInMillis - today.timeInMillis
-
-    val diffInDays = TimeUnit.MILLISECONDS.toDays(diffInMillis)
-
-
-
-    return when (diffInDays) {
-
+/** "Today", "Yesterday", "Tomorrow", otherwise "Nov 2". */
+private fun relativeDayLabel(startOfDay: Long): String =
+    when (TimeUnit.MILLISECONDS.toDays(startOfDay - startOfDay())) {
         0L -> "Today"
-
         -1L -> "Yesterday"
-
         1L -> "Tomorrow"
-
-        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(selectedDate)
-
+        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(startOfDay))
     }
 
-}
-
-
-
+/**
+ * Daily log: pick a day from the month strip (or the full calendar) and see that day's totals
+ * and every set, grouped by exercise. [recordedSetsToday] holds the sets of the selected day.
+ */
 @Composable
-
 fun TodayScreen(
-
     modifier: Modifier = Modifier,
-
     activeDays: Set<Long>,
-
     totalReps: Int,
-
     totalSets: Int,
-
     uniqueExercises: Int,
-
     recordedSetsToday: List<RecordedSet>,
-
     unitSystem: UnitSystem,
-
     onDateSelected: (Date) -> Unit,
-
     onNavigateToExerciseDetail: (String) -> Unit
-
 ) {
+    val today = remember { startOfDay() }
+    var selectedDay by rememberSaveable { mutableLongStateOf(today) }
+    var showCalendar by remember { mutableStateOf(false) }
+    val days = remember(selectedDay) { daysOfMonth(selectedDay) }
 
-    val initialCalendar = Calendar.getInstance()
-
-    var displayMonth by remember { mutableStateOf(initialCalendar.get(Calendar.MONTH)) }
-
-    var displayYear by remember { mutableStateOf(initialCalendar.get(Calendar.YEAR)) }
-
-
-
-    fun getDaysForDisplayedMonth(month: Int, year: Int, activeDaysSet: Set<Long>): List<DayItem> {
-
-        val list = ArrayList<DayItem>()
-
-        val sdfDayOfMonth = SimpleDateFormat("d", Locale.getDefault())
-
-        val sdfDayOfWeek = SimpleDateFormat("E", Locale.getDefault())
-
-        val cal = Calendar.getInstance().apply { set(Calendar.MONTH, month); set(Calendar.YEAR, year) }
-
-        val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-
-        for (i in 1..daysInMonth) {
-
-            cal.set(Calendar.DAY_OF_MONTH, i)
-
-            val dayStartCal = Calendar.getInstance().apply {
-                time = cal.time
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }
-            val hasActivity = activeDaysSet.contains(dayStartCal.timeInMillis) || (dayStartCal.timeInMillis == Calendar.getInstance().apply { time = Date(); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis && recordedSetsToday.isNotEmpty())
-
-            list.add(DayItem(sdfDayOfMonth.format(cal.time), sdfDayOfWeek.format(cal.time), cal.time, hasActivity = hasActivity))
-
-        }
-
-        return list
-
+    fun select(day: Long) {
+        selectedDay = day
+        onDateSelected(Date(day))
     }
 
+    if (showCalendar) {
+        CalendarSheet(
+            selectedDay = selectedDay,
+            activeDays = activeDays,
+            onSelect = { day ->
+                select(day)
+                showCalendar = false
+            },
+            onDismiss = { showCalendar = false }
+        )
+    }
 
-
-    var daysInCurrentMonth by remember(displayMonth, displayYear, activeDays, recordedSetsToday.size) { mutableStateOf(getDaysForDisplayedMonth(displayMonth, displayYear, activeDays)) }
-
-    val todayDayOfMonthStr = SimpleDateFormat("d", Locale.getDefault()).format(Date())
-
-    var selectedDay by remember {
-
-        mutableStateOf(
-
-            daysInCurrentMonth.find { it.dayOfMonth == todayDayOfMonthStr && Calendar.getInstance().apply { time = it.fullDate }.get(Calendar.MONTH) == displayMonth }
-
-                ?: daysInCurrentMonth.firstOrNull()
-
-                ?: DayItem(todayDayOfMonthStr, "", Date(), true)
-
+    Column(modifier = modifier.fillMaxSize()) {
+        GlassTopBar(
+            eyebrow = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date(selectedDay)),
+            title = relativeDayLabel(selectedDay),
+            actions = { GlassIconButton(Icons.Filled.CalendarMonth, contentDescription = "Open calendar", onClick = { showCalendar = true }) }
+        )
+        DayStrip(
+            days = days,
+            selectedDay = selectedDay,
+            today = today,
+            // The selected day's own sets count too, in case analytics haven't caught up yet
+            hasActivity = { it in activeDays || (it == selectedDay && recordedSetsToday.isNotEmpty()) },
+            onSelect = ::select
         )
 
-    }
-
-    daysInCurrentMonth = daysInCurrentMonth.map { it.copy(isSelected = (it.fullDate == selectedDay.fullDate)) }
-
-    var showCalendarDialog by remember { mutableStateOf(false) }
-
-
-
-    if (showCalendarDialog) {
-
-        Dialog(onDismissRequest = { showCalendarDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-
-            Surface(modifier = Modifier.fillMaxSize()) {
-
-                FullScreenCalendarScreen(
-
-                    initialDate = selectedDay.fullDate,
-
-                    onDateSelected = { newDate ->
-
-                        val calNew = Calendar.getInstance().apply { time = newDate }
-
-                        displayMonth = calNew.get(Calendar.MONTH); displayYear = calNew.get(Calendar.YEAR)
-
-                        val newDaysList = getDaysForDisplayedMonth(displayMonth, displayYear, activeDays)
-
-                        selectedDay = newDaysList.find { val calExisting = Calendar.getInstance().apply { time = it.fullDate }; calExisting.get(Calendar.YEAR) == displayYear && calExisting.get(Calendar.DAY_OF_YEAR) == calNew.get(Calendar.DAY_OF_YEAR) } ?: newDaysList.first()
-
-                        daysInCurrentMonth = newDaysList.map { it.copy(isSelected = (it.fullDate == selectedDay.fullDate)) }
-
-                        onDateSelected(newDate)
-
-                        showCalendarDialog = false
-
-                    },
-
-                    onDismiss = { showCalendarDialog = false }
-
-                )
-
-            }
-
+        val setsByExercise = remember(recordedSetsToday) {
+            recordedSetsToday.groupBy { it.exerciseName }.mapValues { (_, sets) -> sets.sortedBy { it.setNumber } }
         }
-
-    }
-
-
-
-    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
-
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-
-            Icon(imageVector = Icons.Filled.CalendarToday, contentDescription = "Calendar", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp).clickable { showCalendarDialog = true })
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(text = formatDateAsRelative(selectedDay.fullDate), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-
-        }
-
-        LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-
-            itemsIndexed(daysInCurrentMonth, key = { _, item -> item.fullDate.time }) { _, dayItem -> 
-
-                DayPill(
-
-                    dayItem = dayItem, 
-
-                    isSelected = dayItem.fullDate == selectedDay.fullDate, 
-
-                    onDaySelected = { 
-
-                        selectedDay = dayItem
-
-                        daysInCurrentMonth = daysInCurrentMonth.map { it.copy(isSelected = (it.fullDate == dayItem.fullDate)) } 
-
-                        onDateSelected(dayItem.fullDate)
-
-                    }
-
-                ) 
-
-            }
-
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-
-            SummaryCard("REPS", totalReps.toString(), MaterialTheme.colorScheme.primary)
-
-            SummaryCard("SETS", totalSets.toString(), MaterialTheme.colorScheme.secondary)
-
-            SummaryCard("EXERCISES", uniqueExercises.toString(), MaterialTheme.colorScheme.tertiary)
-
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-
-
-        // Pro-Tip: Cache the grouped sets to avoid heavy recalculations on every Recomposition
-
-        val groupedSets = remember(recordedSetsToday) {
-
-            recordedSetsToday.groupBy { it.exerciseName }
-
-        }
-
-        
-
-        if (recordedSetsToday.isNotEmpty()) {
-
-            LazyColumn(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
-
-                groupedSets.forEach { (exerciseName, sets) ->
-
-                    item(key = "header_$exerciseName", contentType = "ExerciseHeader") { 
-
-                        Text(
-
-                            text = exerciseName, 
-
-                            style = MaterialTheme.typography.titleMedium, 
-
-                            fontWeight = FontWeight.Bold, 
-
-                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp).clickable { onNavigateToExerciseDetail(exerciseName) }, 
-
-                            color = MaterialTheme.colorScheme.onBackground
-
-                        ) 
-
-                    }
-
-                    items(
-
-                        items = sets, 
-
-                        key = { set -> set.firestoreDocId ?: "set_${set.timestamp.seconds}_${set.timestamp.nanoseconds}" },
-
-                        contentType = { "RecordedSetItem" }
-
-                    ) { setItem ->
-
-                        // Pro-Tip: Isolated Component for individual set rendering
-
-                        RecordedSetRow(setItem, unitSystem)
-
-                    }
-
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    GlassStatTile(Icons.Filled.Repeat, "Reps", totalReps.toString(), Modifier.weight(1f))
+                    GlassStatTile(Icons.Filled.Layers, "Sets", totalSets.toString(), Modifier.weight(1f))
+                    GlassStatTile(Icons.Filled.FitnessCenter, "Exercises", uniqueExercises.toString(), Modifier.weight(1f))
                 }
-
             }
-
-        } else {
-
-            Box(modifier = Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) { Text("No sets recorded for today yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-
+            if (setsByExercise.isEmpty()) {
+                item { EmptyDayCard(isToday = selectedDay == today) }
+            } else {
+                items(setsByExercise.entries.toList(), key = { it.key }) { (exerciseName, sets) ->
+                    ExerciseLogCard(
+                        exerciseName = exerciseName,
+                        sets = sets,
+                        unitSystem = unitSystem,
+                        onClick = { onNavigateToExerciseDetail(exerciseName) }
+                    )
+                }
+            }
         }
-
     }
-
 }
 
-
-
-// Pro-Tip: Isolating the Row prevents the entire LazyColumn from recomposing if only one set changes
-
 @Composable
-
-fun RecordedSetRow(setItem: RecordedSet, unitSystem: UnitSystem) {
-
-    // Memoize the weight calculation so it doesn't recalculate on every single frame scroll
-
-    val formattedWeightText = remember(setItem.weight, unitSystem) {
-
-        val displayWeight = if (unitSystem == UnitSystem.IMPERIAL) setItem.weight * 2.20462 else setItem.weight.toDouble()
-
-        val weightUnitString = if (unitSystem == UnitSystem.IMPERIAL) "lbs" else "kg"
-
-        val formattedWeight = if (displayWeight.rem(1.0) == 0.0) displayWeight.toInt().toString() else String.format(Locale.US, "%.1f", displayWeight)
-
-        "  $formattedWeight $weightUnitString, rep ${setItem.reps}"
-
+private fun DayStrip(
+    days: List<Long>,
+    selectedDay: Long,
+    today: Long,
+    hasActivity: (Long) -> Boolean,
+    onSelect: (Long) -> Unit
+) {
+    val listState = rememberLazyListState()
+    // Keep the selected day in view (with two days of context to its left), e.g. the 25th on open
+    LaunchedEffect(selectedDay, days) {
+        val index = days.indexOf(selectedDay)
+        if (index >= 0) listState.animateScrollToItem((index - 2).coerceAtLeast(0))
     }
-
-
-
-    Text(
-
-        text = formattedWeightText,
-
-        style = MaterialTheme.typography.bodyMedium,
-
-        modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
-
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-
-    )
-
-}
-
-
-
-@Composable
-
-fun SummaryCard(title: String, value: String, valueColor: Color) {
-
-    Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.width(100.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))) {
-
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-
-            Text(text = title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(text = value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = valueColor)
-
-        }
-
-    }
-
-}
-
-
-
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-
-@Composable
-
-fun TodayScreenDarkPreview() {
-
-    ShredzillaTheme {
-
-        Surface {
-
-            TodayScreen(
-
-                activeDays = emptySet(),
-
-                totalReps = 53, totalSets = 9, uniqueExercises = 3,
-
-                recordedSetsToday = listOf(
-
-                    RecordedSet(exerciseName= "Bench Press", setNumber = 1, reps = 5, weight = 35.0f, notes = null, timestamp = Timestamp(System.currentTimeMillis()/1000, 0), exerciseId = "bench_press", firestoreDocId = null),
-
-                    RecordedSet(exerciseName ="Bench Press", setNumber = 2, reps = 7, weight = 35.0f, notes = null, timestamp = Timestamp(System.currentTimeMillis()/1000, 100), exerciseId = "bench_press", firestoreDocId = null)
-
-                ),
-
-                unitSystem = UnitSystem.METRIC,
-
-                onDateSelected = {},
-
-                onNavigateToExerciseDetail = {}
-
+    LazyRow(
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(days, key = { it }) { day ->
+            DayPill(
+                dayStart = day,
+                isSelected = day == selectedDay,
+                isToday = day == today,
+                hasActivity = hasActivity(day),
+                onClick = { onSelect(day) }
             )
-
         }
-
     }
-
 }
 
+@Composable
+private fun ExerciseLogCard(
+    exerciseName: String,
+    sets: List<RecordedSet>,
+    unitSystem: UnitSystem,
+    onClick: () -> Unit
+) {
+    val palette = MaterialTheme.glass
+    val volume = remember(sets) { sets.sumOf { it.weight.toDouble() * it.reps }.roundToLong().toDouble() }
 
-
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_NO)
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(GlassDefaults.CardShape)
+            .clickable(onClick = onClick),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(exerciseName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
+                Text("Volume ${formatStoredWeight(volume, unitSystem)}", style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
+            }
+            GlassChip(text = "${sets.size} ${if (sets.size == 1) "set" else "sets"}")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)
+        }
+        sets.forEach { set -> SetRow(set, unitSystem) }
+    }
+}
 
 @Composable
-
-fun TodayScreenLightPreview() {
-
-    ShredzillaTheme {
-
-        Surface {
-
-            TodayScreen(
-
-                activeDays = emptySet(), // Added activeDays for consistency with the instruction's implied usage
-
-                totalReps = 53, totalSets = 9, uniqueExercises = 3,
-
-                recordedSetsToday = listOf(
-
-                    RecordedSet(exerciseName = "Incline Bench Press", setNumber = 1, reps = 3, weight = 10.0f, notes = null, timestamp = Timestamp(System.currentTimeMillis()/1000, 200), exerciseId = "incline_bench_press", firestoreDocId = null)
-
-                ),
-
-                unitSystem = UnitSystem.IMPERIAL,
-
-                onDateSelected = {},
-
-                onNavigateToExerciseDetail = {}
-
-            )
-
+private fun SetRow(set: RecordedSet, unitSystem: UnitSystem) {
+    val palette = MaterialTheme.glass
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(28.dp).glassSurface(palette, CircleShape)
+        ) {
+            Text(set.setNumber.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = palette.accent)
         }
-
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = formatStoredWeight(set.weight.toDouble(), unitSystem),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = palette.content
+        )
+        Text("  ×  ${set.reps} reps", style = MaterialTheme.typography.bodyLarge, color = palette.contentMuted)
+        set.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+            Text(
+                text = notes,
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.contentMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(start = 12.dp)
+            )
+        }
     }
+}
 
+@Composable
+private fun EmptyDayCard(isToday: Boolean) {
+    val palette = MaterialTheme.glass
+    GlassCard(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        GlassIconBadge(
+            painter = rememberVectorPainter(Icons.Filled.SelfImprovement),
+            size = 64.dp,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+        Text(
+            text = if (isToday) "Nothing logged yet today" else "Rest day",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = palette.content,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+        Text(
+            text = if (isToday) "Record a set from your exercise library and it shows up here."
+            else "No sets were recorded on this day.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = palette.contentMuted,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun TodayScreenPreview() {
+    ShredzillaTheme {
+        TodayScreen(
+            activeDays = emptySet(),
+            totalReps = 12, totalSets = 2, uniqueExercises = 1,
+            recordedSetsToday = listOf(
+                RecordedSet("Bench Press", 1, 5, 35f, timestamp = Timestamp(Date()), exerciseId = "bench_press"),
+                RecordedSet("Bench Press", 2, 7, 35f, timestamp = Timestamp(Date()), exerciseId = "bench_press")
+            ),
+            unitSystem = UnitSystem.METRIC,
+            onDateSelected = {},
+            onNavigateToExerciseDetail = {}
+        )
+    }
 }

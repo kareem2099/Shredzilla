@@ -9,7 +9,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.FreeRave.shredzilla.utils.AppOpenAdManager
 import com.google.android.gms.ads.MobileAds
-import com.FreeRave.shredzilla.SplashActivity // Import SplashActivity
 
 class MyApplication : Application(), Application.ActivityLifecycleCallbacks, DefaultLifecycleObserver {
 

@@ -5,18 +5,19 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.airbnb.lottie.compose.*
+import com.FreeRave.shredzilla.ui.glass.GlassBackground
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
-import com.FreeRave.shredzilla.R
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (!isTaskRoot && intent.hasCategory(Intent.CATEGORY_LAUNCHER) && intent.action == Intent.ACTION_MAIN) {
             finish()
@@ -57,10 +58,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    GlassBackground(contentAlignment = Alignment.Center) {
         LottieAnimation(
             composition = composition,
             progress = { progress },
