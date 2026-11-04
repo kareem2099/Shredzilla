@@ -101,6 +101,9 @@ data class RecordedSet(
     val firestoreDocId: String? = null
 )
 
+/** Firestore document id / analytics key for an exercise name, e.g. "Bench Press" -> "bench_press". */
+fun exerciseIdOf(name: String): String = name.lowercase().replace(" ", "_")
+
 // Data class for exercise display information
 data class ExerciseDisplayInfo(
     val id: String,

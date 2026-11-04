@@ -19,8 +19,15 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.FreeRave.shredzilla.models.exerciseIdOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -52,31 +59,44 @@ class UserDataManager(
     // --- Listener Management ---
     private val listeners = mutableListOf<com.google.firebase.firestore.ListenerRegistration>()
 
+    // Signed-in user whose library (users/{uid}/exercises) add/delete operate on
+    private var libraryUserId: String? = null
+
     fun clearAllListeners() {
         listeners.forEach { it.remove() }
         listeners.clear()
         todaySetsListener = null
+        libraryUserId = null
+        masterExerciseList.clear()
     }
+
+    private fun userExercisesCollection(userId: String) =
+        db.collection("users").document(userId).collection("exercises")
 
     // --- Firestore Listeners ---
     fun setupFirestoreListeners(currentUser: FirebaseUser?) {
-        // Listener for commonExercises
-        val commonExercisesRegistration = db.collection("commonExercises").orderBy("name")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null) {
-                    Log.w("Firestore", "Listen failed for commonExercises.", e)
-                    return@addSnapshotListener
-                }
-                val exercises = mutableListOf<String>()
-                snapshots?.forEach { doc ->
-                    doc.getString("name")?.let { exercises.add(it) }
-                }
-                masterExerciseList.clear()
-                masterExerciseList.addAll(exercises.distinct())
-            }
-        listeners.add(commonExercisesRegistration)
+        libraryUserId = currentUser?.uid
+        masterExerciseList.clear()
 
         currentUser?.uid?.let { userId ->
+            // Listener for the user's own exercise library
+            val exercisesRegistration = userExercisesCollection(userId).orderBy("name")
+                .addSnapshotListener { snapshots, e ->
+                    if (e != null) {
+                        Log.w("Firestore", "Listen failed for exercises of $userId.", e)
+                        return@addSnapshotListener
+                    }
+                    val exercises = mutableListOf<String>()
+                    snapshots?.forEach { doc ->
+                        doc.getString("name")?.let { exercises.add(it) }
+                    }
+                    masterExerciseList.clear()
+                    masterExerciseList.addAll(exercises.distinct())
+                }
+            listeners.add(exercisesRegistration)
+
+            ensureExerciseLibrarySeeded(userId)
+
             // Listener for user document
             val userDocRegistration = db.collection("users").document(userId)
                 .addSnapshotListener { userDocSnapshot, e ->
@@ -85,12 +105,6 @@ class UserDataManager(
                         return@addSnapshotListener
                     }
                     if (userDocSnapshot != null && userDocSnapshot.exists()) {
-                        @Suppress("UNCHECKED_CAST")
-                        (userDocSnapshot.get("initialExercises") as? List<String>)?.forEach {
-                            addExerciseToCommonExercises(
-                                it
-                            )
-                        }
                         userDocSnapshot.getString("restTimePreference")
                             ?.let { userRestTimePreference = it }
                         @Suppress("UNCHECKED_CAST")
@@ -238,11 +252,13 @@ class UserDataManager(
 
     // --- Data Modification Functions ---
 
+    // Adds to the signed-in user's library (users/{uid}/exercises). The name is kept for existing call sites;
+    // the shared commonExercises collection is no longer written.
     fun addExerciseToCommonExercises(exerciseName: String) {
         val trimmedName = exerciseName.trim()
-        if (trimmedName.isNotBlank()) {
-            val exerciseDocId = trimmedName.lowercase().replace(" ", "_")
-            val exerciseDocRef = db.collection("commonExercises").document(exerciseDocId)
+        val userId = libraryUserId
+        if (trimmedName.isNotBlank() && userId != null) {
+            val exerciseDocRef = userExercisesCollection(userId).document(exerciseIdOf(trimmedName))
             db.runTransaction { transaction ->
                 val snapshot = transaction.get(exerciseDocRef)
                 if (!snapshot.exists()) {
@@ -253,30 +269,126 @@ class UserDataManager(
                 }
                 null
             }.addOnFailureListener { e ->
-                Log.w("Firestore", "Error adding exercise '$trimmedName' to commonExercises", e)
+                Log.w("Firestore", "Error adding exercise '$trimmedName' to library of $userId", e)
             }
+        } else if (userId == null) {
+            Log.w("Firestore", "No signed-in user; not adding exercise '$trimmedName'.")
         }
     }
 
+    // Deletes from the signed-in user's library only.
     fun deleteExerciseFromFirestore(exerciseName: String) {
         val trimmedName = exerciseName.trim()
-        if (trimmedName.isNotBlank()) {
-            val exerciseDocId = trimmedName.lowercase().replace(" ", "_")
-            db.collection("commonExercises").document(exerciseDocId).delete()
+        val userId = libraryUserId
+        if (trimmedName.isNotBlank() && userId != null) {
+            userExercisesCollection(userId).document(exerciseIdOf(trimmedName)).delete()
                 .addOnSuccessListener {
                     Log.d(
                         "Firestore",
-                        "Exercise $trimmedName deleted from commonExercises."
+                        "Exercise $trimmedName deleted from library of $userId."
                     )
                 }
                 .addOnFailureListener { e ->
                     Log.e(
                         "Firestore",
-                        "Error deleting $trimmedName from commonExercises",
+                        "Error deleting $trimmedName from library of $userId",
                         e
                     )
                 }
+        } else if (userId == null) {
+            Log.w("Firestore", "No signed-in user; not deleting exercise '$trimmedName'.")
         }
+    }
+
+    // --- Exercise library seeding / one-time migration ---
+
+    private val seedScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val seedAttemptedUserIds = mutableSetOf<String>()
+
+    /**
+     * Makes sure users/{uid}/exercises is populated once. New users get their onboarding picks
+     * (initialExercises); users from before the library was per-user get the exercises they actually
+     * use (lastPerformedTimestamps, exercise lists), falling back to the old shared commonExercises
+     * contents and finally the built-in list. Idempotent: skipped when the exerciseLibrarySeeded flag
+     * is set or the collection already has docs, and doc ids are deterministic (exerciseIdOf(name)).
+     */
+    private fun ensureExerciseLibrarySeeded(userId: String) {
+        if (!seedAttemptedUserIds.add(userId)) return
+        seedScope.launch {
+            try {
+                seedExerciseLibrary(userId)
+            } catch (e: Exception) {
+                // Allow a retry on the next listener setup (e.g. when we were offline).
+                seedAttemptedUserIds.remove(userId)
+                Log.w("Firestore", "Exercise library seeding failed for $userId", e)
+            }
+        }
+    }
+
+    private suspend fun seedExerciseLibrary(userId: String) {
+        val userDocRef = db.collection("users").document(userId)
+        // Server reads only: a cached "empty" result while offline must not trigger seeding.
+        val userDoc = userDocRef.get(Source.SERVER).await()
+        if (!userDoc.exists() || userDoc.getBoolean(LIBRARY_SEEDED_FIELD) == true) return
+
+        val markSeeded = mapOf(LIBRARY_SEEDED_FIELD to true)
+        if (!userExercisesCollection(userId).limit(1).get(Source.SERVER).await().isEmpty) {
+            userDocRef.set(markSeeded, SetOptions.merge()).await()
+            return
+        }
+
+        // id -> display name, from the built-in list (by both its id and exerciseIdOf(name)) and commonExercises
+        val knownNames = mutableMapOf<String, String>()
+        val commonExercises = try {
+            db.collection("commonExercises").get(Source.SERVER).await().documents
+        } catch (e: Exception) {
+            Log.w("Firestore", "Could not read commonExercises during migration", e)
+            emptyList()
+        }
+        commonExercises.forEach { doc ->
+            // Older builds wrote ids as names (e.g. "bench_press"); those carry no extra information.
+            doc.getString("name")?.trim()?.takeIf { it.isNotBlank() && it != doc.id }
+                ?.let { knownNames[doc.id] = it }
+        }
+        initialGlobalExerciseList.forEach { item ->
+            knownNames[item.id] = item.name
+            knownNames[exerciseIdOf(item.name)] = item.name
+        }
+        fun nameForId(id: String): String = knownNames[id]
+            ?: id.split('_').filter { it.isNotBlank() }
+                .joinToString(" ") { word -> word.replaceFirstChar { it.titlecase(Locale.ROOT) } }
+
+        val usedIds = linkedSetOf<String>()
+        @Suppress("UNCHECKED_CAST")
+        (userDoc.get("initialExercises") as? List<String>)?.let { usedIds.addAll(it) }
+        @Suppress("UNCHECKED_CAST")
+        (userDoc.get("lastPerformedTimestamps") as? Map<String, Any>)?.keys?.let { usedIds.addAll(it) }
+        userDocRef.collection("exerciseLists").get(Source.SERVER).await().documents.forEach { doc ->
+            @Suppress("UNCHECKED_CAST")
+            (doc.get("exerciseIds") as? List<String>)?.let { usedIds.addAll(it) }
+        }
+
+        var names = usedIds.filter { it.isNotBlank() }.map { nameForId(it) }
+        if (names.isEmpty()) names = commonExercises.map { nameForId(it.id) }
+        if (names.isEmpty()) names = initialGlobalExerciseList.map { it.name }
+        val namesById = names.map { it.trim() }.filter { it.isNotBlank() }
+            .associateBy { exerciseIdOf(it) }
+
+        // Batched writes are capped at 500 operations; the last chunk also sets the flag.
+        val entries = namesById.entries.toList()
+        val chunks = entries.chunked(400).ifEmpty { listOf(emptyList()) }
+        chunks.forEachIndexed { index, chunk ->
+            val batch = db.batch()
+            chunk.forEach { (docId, name) ->
+                batch.set(
+                    userExercisesCollection(userId).document(docId),
+                    mapOf("name" to name, "createdAt" to FieldValue.serverTimestamp())
+                )
+            }
+            if (index == chunks.lastIndex) batch.set(userDocRef, markSeeded, SetOptions.merge())
+            batch.commit().await()
+        }
+        Log.d("Firestore", "Seeded exercise library for $userId with ${entries.size} exercises.")
     }
 
     fun updateProfileImagePathInFirestore(newPath: String?, currentUser: FirebaseUser?) {
@@ -510,5 +622,9 @@ class UserDataManager(
             db.collection("users").document(userId).collection("exerciseLists").document(listId)
                 .set(listUpdateData, SetOptions.merge())
         }
+    }
+
+    companion object {
+        private const val LIBRARY_SEEDED_FIELD = "exerciseLibrarySeeded"
     }
 }
