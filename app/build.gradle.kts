@@ -86,6 +86,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.lottie.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.reorderable)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.lifecycle.process) // Added for ProcessLifecycleOwner
     implementation(libs.firebase.auth.ktx)      // Firebase Authentication

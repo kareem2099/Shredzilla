@@ -37,7 +37,8 @@ import com.FreeRave.shredzilla.ui.glass.glassSurface
 import com.FreeRave.shredzilla.ui.theme.glass
 
 /**
- * Exercise row: tap to open, "+" to record a set, swipe towards the start to delete.
+ * Exercise row: tap to open, "+" to record a set, swipe towards the start to delete, and an
+ * optional leading [dragHandle] for lists that can be reordered.
  * The swipe only *asks* to delete: the card springs back and [onDelete] shows the confirmation,
  * so cancelling never leaves an invisible row behind.
  */
@@ -51,7 +52,8 @@ fun SwipableExerciseListItem(
     modifier: Modifier = Modifier,
     swipeEnabled: Boolean = true,
     progress: String? = null,
-    progressDone: Boolean = false
+    progressDone: Boolean = false,
+    dragHandle: (@Composable () -> Unit)? = null
 ) {
     val dismissState = rememberSwipeToDismissBoxState()
     LaunchedEffect(dismissState.currentValue) {
@@ -77,7 +79,8 @@ fun SwipableExerciseListItem(
             progress = progress,
             progressDone = progressDone,
             onClick = onClick,
-            onRecord = onRecord
+            onRecord = onRecord,
+            dragHandle = dragHandle
         )
     }
 }
@@ -108,7 +111,8 @@ private fun ExerciseCard(
     progress: String?,
     progressDone: Boolean,
     onClick: () -> Unit,
-    onRecord: () -> Unit
+    onRecord: () -> Unit,
+    dragHandle: (@Composable () -> Unit)?
 ) {
     val palette = MaterialTheme.glass
     Row(
@@ -116,9 +120,10 @@ private fun ExerciseCard(
             .fillMaxWidth()
             .glassSurface(palette, GlassDefaults.CardShape)
             .clickable(onClick = onClick)
-            .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+            .padding(start = if (dragHandle != null) 4.dp else 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        dragHandle?.invoke()
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 name,

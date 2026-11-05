@@ -28,5 +28,9 @@ object AppRoutes {
     const val FITNESS_MAIN = "fitness_main" // Root for the main app content after auth/onboarding
     const val AD_REWARDS_SCREEN = "ad_rewards_screen" // New route for ad rewards
     const val PROGRAMS = "programs" // Ready-made splits
+    const val WORKOUT = "workout/{listId}" // Guided session through one list
+    const val WORKOUT_HISTORY = "workout_history"
+    const val WORKOUT_LOG = "workout_log/{logId}"
+    const val PERSONAL_RECORDS = "personal_records"
     const val EXERCISE_DETAIL = "exercise_detail/{exerciseId}" // New route for individual exercise details
 }

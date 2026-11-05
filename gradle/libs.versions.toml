@@ -23,8 +23,10 @@ appUpdater = "2.7"
 lifecycleProcess = "2.11.0"
 credentials = "1.6.0"
 googleid = "1.2.0"
+reorderable = "2.5.1"
 
 [libraries]
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebaseAuth" }
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx", version.ref = "firebaseFirestore" }

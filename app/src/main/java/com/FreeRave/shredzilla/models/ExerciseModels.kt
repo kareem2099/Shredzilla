@@ -16,7 +16,23 @@ data class LoggedSet(
     val reps: Int,
     val weightKg: Double,
     val notes: String,
-    val timestampMillis: Long
+    val timestampMillis: Long,
+    /** Set on weight-stack machines logged by plate count; [weightKg] is 0 then. */
+    val plates: Int? = null
+) {
+    /** What the chart sums: kg for free weights, plates for stack machines. */
+    val volume: Double get() = reps * (plates?.toDouble() ?: weightKg)
+}
+
+/**
+ * What the user enters for one set. [weight] is in the user's unit; weight-stack machines are
+ * logged as a [plates] count instead, and [weight] is ignored then.
+ */
+data class SetEntry(
+    val reps: Int = 1,
+    val weight: Double = 0.0,
+    val plates: Int? = null,
+    val notes: String = ""
 )
 
 // Data class for an exercise item
@@ -101,7 +117,8 @@ data class RecordedSet(
     val notes: String? = null,
     val timestamp: Timestamp = Timestamp.now(),
     val exerciseId: String,
-    val firestoreDocId: String? = null
+    val firestoreDocId: String? = null,
+    val plates: Int? = null
 )
 
 /** Firestore document id / analytics key for an exercise name, e.g. "Bench Press" -> "bench_press". */

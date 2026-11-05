@@ -49,13 +49,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate started")
 
-        // UX Polish: If the app was killed while the timer was running, the notification gets stuck.
-        // Clearing it on fresh launch ensures it doesn't persist zombie-like.
-        NotificationUtils.cancelTimerRunningNotification(this)
-
         // MobileAds.initialize removed from here — it's already in MyApplication
 
-        NotificationUtils.createNotificationChannel(applicationContext)
+        NotificationUtils.createNotificationChannels(applicationContext)
         // AppUpdater checks internally so no need for AppUpdaterUtils
         AppUpdater(this)
             .setUpdateFrom(UpdateFrom.JSON)

@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.sets
 
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.History
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,6 +63,10 @@ fun SetGraphScreen(
     onNavigateToExerciseList: () -> Unit,
     onOpenPrograms: () -> Unit,
     recommendedProgramName: String?,
+    workoutCount: Int,
+    recordCount: Int,
+    onOpenHistory: () -> Unit,
+    onOpenRecords: () -> Unit,
     onNavigateToCreateNewList: () -> Unit,
     onNavigateToExerciseListDetail: (listId: String, listName: String) -> Unit,
     isTimerRunning: Boolean,
@@ -108,6 +114,24 @@ fun SetGraphScreen(
                     subtitle = recommendedProgramName?.let { "Recommended for you: $it" } ?: "Ready-made splits for every level",
                     onClick = onOpenPrograms
                 )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ShortcutTile(
+                        icon = Icons.Filled.History,
+                        title = "History",
+                        subtitle = "$workoutCount ${if (workoutCount == 1) "workout" else "workouts"}",
+                        onClick = onOpenHistory,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ShortcutTile(
+                        icon = Icons.Filled.EmojiEvents,
+                        title = "Records",
+                        subtitle = "$recordCount ${if (recordCount == 1) "exercise" else "exercises"}",
+                        onClick = onOpenRecords,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
             item { ListsHeader(onCreateList = onNavigateToCreateNewList) }
             if (userExerciseLists.isEmpty()) {
@@ -230,6 +254,24 @@ private fun NavigationCard(icon: ImageVector, title: String, subtitle: String, o
     }
 }
 
+@Composable
+private fun ShortcutTile(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val palette = MaterialTheme.glass
+    GlassCard(
+        modifier = modifier
+            .clip(GlassDefaults.CardShape)
+            .clickable(onClick = onClick),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        GlassIconBadge(painter = rememberVectorPainter(icon), size = 44.dp)
+        Column {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
+        }
+    }
+}
+
 @Preview
 @Composable
 private fun SetGraphScreenPreview() {
@@ -246,6 +288,10 @@ private fun SetGraphScreenPreview() {
             onNavigateToExerciseList = {},
             onOpenPrograms = {},
             recommendedProgramName = "Push / Pull / Legs",
+            workoutCount = 12,
+            recordCount = 8,
+            onOpenHistory = {},
+            onOpenRecords = {},
             onNavigateToCreateNewList = {},
             onNavigateToExerciseListDetail = { _, _ -> },
             isTimerRunning = true,

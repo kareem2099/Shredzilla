@@ -55,6 +55,7 @@ import com.FreeRave.shredzilla.ui.glass.GlassTopBar
 import com.FreeRave.shredzilla.ui.glass.glassSurface
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 import com.FreeRave.shredzilla.ui.theme.glass
+import com.FreeRave.shredzilla.utils.formatSetLoad
 import com.FreeRave.shredzilla.utils.formatStoredWeight
 import com.FreeRave.shredzilla.utils.daysOfMonth
 import com.FreeRave.shredzilla.utils.startOfDay
@@ -212,7 +213,12 @@ private fun ExerciseLogCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(exerciseName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
-                Text("Volume ${formatStoredWeight(volume, unitSystem)}", style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
+                Text(
+                    // Plate-counted sets are stored with 0 kg, so a machine-only card shows reps instead
+                    if (volume > 0) "Volume ${formatStoredWeight(volume, unitSystem)}" else "${sets.sumOf { it.reps }} reps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.contentMuted
+                )
             }
             GlassChip(text = "${sets.size} ${if (sets.size == 1) "set" else "sets"}")
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)
@@ -233,7 +239,7 @@ private fun SetRow(set: RecordedSet, unitSystem: UnitSystem) {
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            text = formatStoredWeight(set.weight.toDouble(), unitSystem),
+            text = formatSetLoad(set.weight.toDouble(), set.plates, unitSystem),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             color = palette.content

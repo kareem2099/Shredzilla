@@ -1,5 +1,54 @@
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/icon"
-    android:gravity="center"
-    android:scaleX="0.6"
-    android:scaleY="0.6" />
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from the icon design: claw marks ("zilla") behind a dumbbell, brand violet / electric blue -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M52,26Q48.7,57.7 28,82Q36.9,52.7 52,26Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="66" android:startY="26" android:endX="42" android:endY="82">
+                <item android:offset="0" android:color="#FF3FA9FF" />
+                <item android:offset="0.5" android:color="#FF7C4DFF" />
+                <item android:offset="1" android:color="#FFE040FB" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M66,26Q62.7,57.7 42,82Q50.9,52.7 66,26Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="66" android:startY="26" android:endX="42" android:endY="82">
+                <item android:offset="0" android:color="#FF3FA9FF" />
+                <item android:offset="0.5" android:color="#FF7C4DFF" />
+                <item android:offset="1" android:color="#FFE040FB" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M80,26Q76.7,57.7 56,82Q64.9,52.7 80,26Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="66" android:startY="26" android:endX="42" android:endY="82">
+                <item android:offset="0" android:color="#FF3FA9FF" />
+                <item android:offset="0.5" android:color="#FF7C4DFF" />
+                <item android:offset="1" android:color="#FFE040FB" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Dark outlines first, then the fills, so joints between bar and plates stay clean -->
+    <group android:rotation="-28" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FF120A2A" android:strokeColor="#FF120A2A" android:strokeWidth="2.6" android:strokeLineJoin="round"
+            android:pathData="M40.5,51H67.5A1.8,1.8 0,0 1,69.3,52.8V55.2A1.8,1.8 0,0 1,67.5,57H40.5A1.8,1.8 0,0 1,38.7,55.2V52.8A1.8,1.8 0,0 1,40.5,51Z" />
+        <path android:fillColor="#FF120A2A" android:strokeColor="#FF120A2A" android:strokeWidth="2.6" android:strokeLineJoin="round"
+            android:pathData="M32.3,44.65H33.2A2.1,2.1 0,0 1,35.3,46.75V61.25A2.1,2.1 0,0 1,33.2,63.35H32.3A2.1,2.1 0,0 1,30.2,61.25V46.75A2.1,2.1 0,0 1,32.3,44.65Z" />
+        <path android:fillColor="#FF120A2A" android:strokeColor="#FF120A2A" android:strokeWidth="2.6" android:strokeLineJoin="round"
+            android:pathData="M74.8,44.65H75.7A2.1,2.1 0,0 1,77.8,46.75V61.25A2.1,2.1 0,0 1,75.7,63.35H74.8A2.1,2.1 0,0 1,72.7,61.25V46.75A2.1,2.1 0,0 1,74.8,44.65Z" />
+        <path android:fillColor="#FF120A2A" android:strokeColor="#FF120A2A" android:strokeWidth="2.6" android:strokeLineJoin="round"
+            android:pathData="M37.05,39.55H38.25A2.6,2.6 0,0 1,40.85,42.15V65.85A2.6,2.6 0,0 1,38.25,68.45H37.05A2.6,2.6 0,0 1,34.45,65.85V42.15A2.6,2.6 0,0 1,37.05,39.55Z" />
+        <path android:fillColor="#FF120A2A" android:strokeColor="#FF120A2A" android:strokeWidth="2.6" android:strokeLineJoin="round"
+            android:pathData="M69.75,39.55H70.95A2.6,2.6 0,0 1,73.55,42.15V65.85A2.6,2.6 0,0 1,70.95,68.45H69.75A2.6,2.6 0,0 1,67.15,65.85V42.15A2.6,2.6 0,0 1,69.75,39.55Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M40.5,52.3H67.5A0.5,0.5 0,0 1,68,52.8V55.2A0.5,0.5 0,0 1,67.5,55.7H40.5A0.5,0.5 0,0 1,40,55.2V52.8A0.5,0.5 0,0 1,40.5,52.3Z" />
+        <path android:fillColor="#FFDCD3FF" android:pathData="M32.3,45.95H33.2A0.8,0.8 0,0 1,34,46.75V61.25A0.8,0.8 0,0 1,33.2,62.05H32.3A0.8,0.8 0,0 1,31.5,61.25V46.75A0.8,0.8 0,0 1,32.3,45.95Z" />
+        <path android:fillColor="#FFDCD3FF" android:pathData="M74.8,45.95H75.7A0.8,0.8 0,0 1,76.5,46.75V61.25A0.8,0.8 0,0 1,75.7,62.05H74.8A0.8,0.8 0,0 1,74,61.25V46.75A0.8,0.8 0,0 1,74.8,45.95Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M37.05,40.85H38.25A1.3,1.3 0,0 1,39.55,42.15V65.85A1.3,1.3 0,0 1,38.25,67.15H37.05A1.3,1.3 0,0 1,35.75,65.85V42.15A1.3,1.3 0,0 1,37.05,40.85Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M69.75,40.85H70.95A1.3,1.3 0,0 1,72.25,42.15V65.85A1.3,1.3 0,0 1,70.95,67.15H69.75A1.3,1.3 0,0 1,68.45,65.85V42.15A1.3,1.3 0,0 1,69.75,40.85Z" />
+    </group>
+</vector>

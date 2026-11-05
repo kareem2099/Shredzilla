@@ -1,5 +1,8 @@
 package com.FreeRave.shredzilla.utils
 
+import com.FreeRave.shredzilla.models.LoggedSet
+import com.FreeRave.shredzilla.models.SetEntry
+import com.FreeRave.shredzilla.models.SetLoad
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
 import java.util.Locale
 
@@ -29,3 +32,24 @@ fun formatWeightNumber(weight: Double): String {
     val rounded = Math.round(weight * 10) / 10.0
     return if (rounded % 1.0 == 0.0) rounded.toLong().toString() else String.format(Locale.US, "%.1f", rounded)
 }
+
+fun platesLabel(plates: Int): String = if (plates == 1) "1 plate" else "$plates plates"
+
+/** The load of a stored set: "6 plates" on a weight stack, otherwise its weight in the user's unit. */
+fun formatSetLoad(weightKg: Double, plates: Int?, unitSystem: UnitSystem): String =
+    plates?.let(::platesLabel) ?: formatStoredWeight(weightKg, unitSystem)
+
+/** A logged set as sheet input, e.g. to edit it or to start the next set from it. */
+fun LoggedSet.toEntry(unitSystem: UnitSystem): SetEntry =
+    SetEntry(reps = reps, weight = kgToDisplay(weightKg, unitSystem), plates = plates, notes = notes)
+
+/** A set as typed (user's unit), e.g. "60 kg × 10", "6 plates × 12", or "15 reps" for bodyweight. */
+fun formatEntry(entry: SetEntry, unitSystem: UnitSystem): String = when {
+    entry.plates != null -> "${platesLabel(entry.plates)} × ${entry.reps}"
+    entry.weight > 0 -> "${formatWeight(entry.weight, unitSystem)} × ${entry.reps}"
+    else -> "${entry.reps} reps"
+}
+
+/** A stored set's load and reps, e.g. "60 kg × 10" or "6 plates × 12". */
+fun formatLoad(load: SetLoad, unitSystem: UnitSystem): String =
+    "${formatSetLoad(load.weightKg, load.plates, unitSystem)} × ${load.reps}"
