@@ -100,6 +100,9 @@ dependencies {
     implementation(libs.androidx.credentials.play.services) // Credential Manager + Play Services bridge
     implementation(libs.googleid)                         // GetGoogleIdOption
     implementation(libs.play.services.ads)      // Google AdMob
+    // AdMob pulls in WorkManager 2.7 with Room 2.2, whose database is created by reflection and
+    // stripped by R8 (release crash on launch); a current WorkManager brings Room's keep rules
+    implementation(libs.androidx.work.runtime)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
