@@ -1,15 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Everything a user owns: profile doc, exercises library, exerciseLists, dailyActivity/recordedSets
+    // Everything a user owns: profile, exercise library and lists, logged sets,
+    // workouts, records and body measurements. Nothing else is readable or writable.
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-
-    // Legacy shared library: read only (used once to migrate users into users/{uid}/exercises)
-    match /commonExercises/{exerciseId} {
-      allow read: if request.auth != null;
-      allow write: if false;
     }
   }
 }
