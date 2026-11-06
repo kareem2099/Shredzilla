@@ -8,6 +8,44 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://dotsuite.dev/en/privacy#dotshredzilla",
+        "type": 302
+      },
+      {
+        "source": "/privacy",
+        "destination": "https://dotsuite.dev/en/privacy#dotshredzilla",
+        "type": 301
+      },
+      {
+        "source": "/privacy_policy.html",
+        "destination": "https://dotsuite.dev/en/privacy#dotshredzilla",
+        "type": 301
+      },
+      {
+        "source": "/terms",
+        "destination": "https://dotsuite.dev/en/dotshredzilla/terms",
+        "type": 301
+      },
+      {
+        "source": "/delete-account",
+        "destination": "https://dotsuite.dev/en/privacy#delete-dotshredzilla",
+        "type": 301
+      }
+    ],
+    "headers": [
+      {
+        "source": "/update-info.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
     ]
   }
 }
