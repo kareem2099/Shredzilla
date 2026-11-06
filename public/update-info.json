@@ -1,6 +1,6 @@
 {
-  "latestVersion": "1.5.0",
-  "latestVersionCode": 8,
+  "latestVersion": "1.5.1",
+  "latestVersionCode": 9,
   "url": "https://play.google.com/store/apps/details?id=com.FreeRave.shredzilla",
   "releaseNotes": [
     "Works offline: your sets save without internet and sync when you're back online.",
@@ -10,6 +10,7 @@
     "Warm-up and rest-pause sets, tempo, plate calculator and next-set suggestions.",
     "Weekly goal, streak and deload reminders.",
     "Body measurements with trends and insights.",
-    "Rest timer on the lock screen and a new icon."
+    "Rest timer on the lock screen and a new icon.",
+    "Profile photos use Android's photo picker, so the app no longer needs access to your whole gallery."
   ]
 }
