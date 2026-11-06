@@ -2,10 +2,10 @@ package com.FreeRave.shredzilla.screens.account
 
 import android.Manifest
 import android.net.Uri
-import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -96,7 +96,7 @@ fun AccountScreen(
         toast("Profile photo updated.")
     }
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { usePhoto(it, "user_profile_gallery_") }
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -112,12 +112,6 @@ fun AccountScreen(
             pendingCameraUri = it
             cameraLauncher.launch(it)
         }
-    }
-    val galleryPermission =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_IMAGES
-        else Manifest.permission.READ_EXTERNAL_STORAGE
-    val galleryPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) galleryLauncher.launch("image/*") else toast("Photo access denied.")
     }
 
     GlassSubpageScaffold(title = "Account", eyebrow = "Settings", onBack = onNavigateBack) {
@@ -194,7 +188,7 @@ fun AccountScreen(
                 showChevron = false,
                 onClick = {
                     showPhotoSheet = false
-                    galleryPermissionLauncher.launch(galleryPermission)
+                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
             if (imagePath != null) {

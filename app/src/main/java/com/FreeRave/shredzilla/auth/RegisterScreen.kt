@@ -50,8 +50,9 @@ import com.FreeRave.shredzilla.ui.glass.GlassPrimaryButton
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 import com.FreeRave.shredzilla.ui.theme.glass
 
-private const val TERMS_URL = "https://shredzilla.app/terms"
-private const val PRIVACY_URL = "https://shredzilla.app/privacy"
+// App-specific terms and privacy are hosted by DotSuite in five languages.
+private const val TERMS_URL = "https://dotsuite.dev/en/dotshredzilla/terms"
+private const val PRIVACY_URL = "https://dotsuite.dev/en/privacy#dotshredzilla"
 private const val MIN_PASSWORD_LENGTH = 6
 
 @Composable

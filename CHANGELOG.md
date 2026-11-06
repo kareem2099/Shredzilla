@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.1] — 2026-11-06
+
+### Fixed
+- Profile photos now use Android's system photo picker, with the AndroidX document-picker fallback on devices without a photo picker. The app only receives access to the selected image.
+- Removed broad photo/shared-storage permissions and the gallery permission prompt; camera capture keeps its separate permission flow.
+- Registration links now open DotShredzilla's own DotSuite terms and privacy pages, including the five-language selector.
+
+### Changed
+- Version name **1.5.1**, version code **9**. Compile/target SDK remains **37**, minimum SDK **29**.
+- Supersedes the blocked version-code-8 upload. Old testing artifacts requesting broad photo access must also be replaced or deactivated in Play Console.
+
+---
+
 ## [1.5.0] — 2026-11-06
 
 ### Added

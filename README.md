@@ -10,6 +10,20 @@
 
 ---
 
+## Current release
+
+**1.5.1 (version code 9)** — targets API 37 and supports Android 10 / API 29+.
+This update replaces broad gallery access with the Android system photo picker
+and corrects the registration links to the app-specific legal pages.
+
+- [Terms of use](https://dotsuite.dev/en/dotshredzilla/terms)
+- [Privacy policy](https://dotsuite.dev/en/privacy#dotshredzilla)
+- [Account and data deletion](https://dotsuite.dev/en/privacy#delete-dotshredzilla)
+- Support: [support@dotsuite.dev](mailto:support@dotsuite.dev)
+
+The legal pages support English, Arabic, German, French and Russian. Canonical
+terms are in [docs/legal](docs/legal/README.md). Native UI labels remain English.
+
 ## Overview
 
 Shredzilla replaces your workout notebook with a blazing-fast, offline-capable fitness tracker. It is engineered with a strict focus on **modern Android architecture**, **persistent state management**, and **seamless real-time data synchronization** — so your data is always safe, even in the deepest gym dead-zones.
@@ -60,7 +74,7 @@ Shredzilla replaces your workout notebook with a blazing-fast, offline-capable f
 
 ### Prerequisites
 - Android Studio (latest stable)
-- Android device or emulator running API 26+
+- Android device or emulator running API 29+
 - A Firebase project
 
 ### Setup
@@ -95,7 +109,7 @@ Shredzilla replaces your workout notebook with a blazing-fast, offline-capable f
 
 ## Roadmap
 
-### v1.3.0 — Modernized Authentication & UX Polish *(Current)*
+### v1.3.0 — Modernized Authentication & UX Polish *(Previous milestone)*
 - [x] Revamped auth screens (Login & Register) with custom vertical gradients and brand assets
 - [x] Fully compliant Google Sign-in buttons (official branding specs)
 - [x] Input focus chaining via FocusRequesters & keyboard Done actions

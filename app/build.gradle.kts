@@ -12,8 +12,8 @@ android {
         applicationId = "com.FreeRave.shredzilla"
         minSdk = 29
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.5.0"
+        versionCode = 9
+        versionName = "1.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
