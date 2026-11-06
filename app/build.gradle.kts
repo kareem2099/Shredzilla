@@ -12,8 +12,8 @@ android {
         applicationId = "com.FreeRave.shredzilla"
         minSdk = 29
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.4.0"
+        versionCode = 8
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -86,18 +86,23 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.lottie.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.reorderable)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.lifecycle.process) // Added for ProcessLifecycleOwner
     implementation(libs.firebase.auth.ktx)      // Firebase Authentication
     implementation(libs.firebase.firestore.ktx) // Firebase Firestore
     implementation(libs.firebase.analytics.ktx) // Firebase Analytics
     implementation(libs.firebase.fcm)           // Firebase Cloud Messaging
+    implementation(libs.firebase.config)        // Remote Config: minimum supported version, update message
+    implementation(libs.play.app.update)        // Google Play in-app updates
     implementation(libs.play.services.auth)              // Google Play Services transport for Credential Manager
     implementation(libs.androidx.credentials)             // Credential Manager core
     implementation(libs.androidx.credentials.play.services) // Credential Manager + Play Services bridge
     implementation(libs.googleid)                         // GetGoogleIdOption
     implementation(libs.play.services.ads)      // Google AdMob
-    implementation(libs.app.updater)
+    // AdMob pulls in WorkManager 2.7 with Room 2.2, whose database is created by reflection and
+    // stripped by R8 (release crash on launch); a current WorkManager brings Room's keep rules
+    implementation(libs.androidx.work.runtime)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

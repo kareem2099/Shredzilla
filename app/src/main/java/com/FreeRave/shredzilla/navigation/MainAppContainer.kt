@@ -1,5 +1,40 @@
 package com.FreeRave.shredzilla.navigation
 
+import com.FreeRave.shredzilla.utils.weeklyProgress
+import com.FreeRave.shredzilla.models.SetType
+import com.FreeRave.shredzilla.screens.body.BodyMeasurementsScreen
+import com.FreeRave.shredzilla.screens.body.MeasurementEntryScreen
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import com.FreeRave.shredzilla.screens.workout.WorkoutScreen
+import com.FreeRave.shredzilla.models.UserExerciseList
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
+import com.FreeRave.shredzilla.composables.PrCelebration
+import com.FreeRave.shredzilla.composables.PrCelebrationBanner
+import com.FreeRave.shredzilla.utils.formatEntry
+import com.FreeRave.shredzilla.utils.RecordCheck
+import com.FreeRave.shredzilla.utils.checkRecord
+import com.FreeRave.shredzilla.utils.displayToKg
+import com.FreeRave.shredzilla.utils.recordsToBackfill
+import com.FreeRave.shredzilla.models.RecordSet
+import com.FreeRave.shredzilla.models.workingSetCount
+import com.FreeRave.shredzilla.screens.history.PersonalRecordsScreen
+import com.FreeRave.shredzilla.screens.history.WorkoutHistoryScreen
+import com.FreeRave.shredzilla.screens.history.WorkoutLogScreen
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.statusBars
+import com.FreeRave.shredzilla.composables.OfflineBanner
+import com.FreeRave.shredzilla.utils.rememberIsOnline
+import com.FreeRave.shredzilla.models.SetEntry
+import com.FreeRave.shredzilla.utils.nextEntry
+import com.FreeRave.shredzilla.utils.SetPrefill
+import com.FreeRave.shredzilla.utils.suggestNextSet
 import com.FreeRave.shredzilla.models.initialGlobalExerciseList
 import com.FreeRave.shredzilla.models.exerciseIdOf
 import android.util.Log
@@ -37,11 +72,8 @@ import com.FreeRave.shredzilla.screens.sets.SetGraphScreen
 import com.FreeRave.shredzilla.screens.today.TodayScreen
 import com.FreeRave.shredzilla.ui.theme.ThemeManager
 import com.google.firebase.Timestamp
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -71,6 +103,7 @@ fun MainAppContainer(
 
     val userDataManager = mainViewModel.userDataManager
     val timerManager = mainViewModel.timerManager
+    val trainingHistory = mainViewModel.trainingHistory
 
     LaunchedEffect(userDataManager.userRestTimePreference) {
         timerManager.updateTotalSecondsFromPreference()
@@ -80,6 +113,7 @@ fun MainAppContainer(
 
     LaunchedEffect(currentUser?.uid) {
         userDataManager.setupFirestoreListeners(currentUser)
+        trainingHistory.start(currentUser?.uid)
         currentUser?.uid?.let { uid ->
             mainViewModel.loadHistoricalAnalytics(uid)
         }
@@ -93,7 +127,13 @@ fun MainAppContainer(
     val exerciseHistory by mainViewModel.exerciseHistory.collectAsState()
     val setsDoneToday = remember(exerciseHistory) {
         val todayKey = dateKeyOf(System.currentTimeMillis())
-        exerciseHistory.mapValues { (_, sets) -> sets.count { it.dateKey == todayKey } }
+        exerciseHistory.mapValues { (_, sets) -> sets.filter { it.dateKey == todayKey }.workingSetCount() }
+    }
+
+    // A training day is any day with a working set; warm-ups alone don't make a workout
+    val weeklyProgress = remember(exerciseHistory, userDataManager.userWeeklyGoalDays, userDataManager.deloadWeeks) {
+        val trainingDays = exerciseHistory.values.flatten().filter { it.setType != SetType.WARMUP }.map { it.dateKey }.toSet()
+        weeklyProgress(trainingDays, userDataManager.userWeeklyGoalDays, userDataManager.deloadWeeks)
     }
 
     val searchQuery by mainViewModel.searchQuery.collectAsState()
@@ -124,6 +164,30 @@ fun MainAppContainer(
         }
     }
 
+    fun exerciseNameFor(exerciseId: String): String =
+        userDataManager.masterExerciseList.find { exerciseIdOf(it) == exerciseId }
+            ?: initialGlobalExerciseList.find { it.id == exerciseId }?.name
+            ?: exerciseId.split('_').joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
+
+    // Records started with this feature, so older bests are filled in from the loaded history.
+    // Only after the records snapshot arrived, or every best would look new.
+    LaunchedEffect(exerciseHistory, trainingHistory.recordsLoaded) {
+        if (!trainingHistory.recordsLoaded) return@LaunchedEffect
+        exerciseHistory.forEach { (exerciseId, sets) ->
+            recordsToBackfill(sets, trainingHistory.personalRecords[exerciseId]).forEach { (isPlates, record) ->
+                trainingHistory.saveRecord(exerciseId, exerciseNameFor(exerciseId), isPlates, record)
+            }
+        }
+    }
+
+    // A list's exercises in its saved order; ids no longer in the library are skipped
+    fun exercisesOf(list: UserExerciseList?): List<ExerciseDisplayInfo> =
+        list?.exerciseIds.orEmpty().mapNotNull { exerciseId ->
+            userDataManager.masterExerciseList.find { exerciseIdOf(it) == exerciseId }?.let(::displayInfoFor)
+        }
+
+    fun targetSetsOf(list: UserExerciseList?): IntRange? = list?.targetSetsMin?.let { min -> min..(list.targetSetsMax ?: min) }
+
     fun openExercise(exerciseName: String) {
         bottomBarNavController.navigate(AppRoutes.EXERCISE_DETAIL.replace("{exerciseId}", exerciseIdOf(exerciseName)))
     }
@@ -133,9 +197,37 @@ fun MainAppContainer(
         currentUser?.uid?.let { mainViewModel.loadHistoricalAnalytics(it, force = true) }
     }
 
-    val recordSetAndStartTimerAction: (String, Int, Double, String) -> Unit = { exName, reps, weight, notes ->
-        userDataManager.recordSet(exName, reps, weight, notes, currentUser, onSaved = ::refreshHistory)
-        timerManager.startRestTimer()
+    var celebration by remember { mutableStateOf<PrCelebration?>(null) }
+
+    fun logSet(exName: String, entry: SetEntry, startRest: Boolean = true) {
+        // Checked against the all-time record and the history before this set lands in it
+        val unitSystem = userDataManager.userUnitSystem
+        val exerciseId = exerciseIdOf(exName)
+        val check = checkRecord(exerciseHistory[exerciseId].orEmpty(), trainingHistory.personalRecords[exerciseId], entry, unitSystem)
+        if (check != RecordCheck.NONE) {
+            val load = entry.plates?.toDouble() ?: displayToKg(entry.weight, unitSystem)
+            trainingHistory.saveRecord(exerciseId, exName, entry.plates != null, RecordSet(load, entry.reps, System.currentTimeMillis()))
+        }
+        if (check == RecordCheck.BEATEN) celebration = PrCelebration(exName, formatEntry(entry, unitSystem))
+        // One side at a time: rest once both sides of the pair are done, not between them
+        val todaySets = exerciseHistory[exerciseId].orEmpty().filter { it.dateKey == dateKeyOf(System.currentTimeMillis()) }
+        val pairComplete = entry.side == null ||
+            todaySets.count { it.side == entry.side } + 1 <= todaySets.count { it.side == entry.side.opposite }
+        userDataManager.recordSet(exName, entry, currentUser, onSaved = ::refreshHistory)
+        if (startRest && pairComplete) timerManager.startRestTimer()
+    }
+
+    val recordSetAndStartTimerAction: (String, SetEntry) -> Unit = { exName, entry -> logSet(exName, entry) }
+
+    // A new set starts from the last one logged, so machine exercises stay in plates and the load is
+    // ready; the suggestion is the progression step from the last session
+    fun prefillFor(exerciseName: String): SetPrefill {
+        val history = exerciseHistory[exerciseIdOf(exerciseName)].orEmpty()
+        val unitSystem = userDataManager.userUnitSystem
+        return SetPrefill(
+            initial = history.firstOrNull()?.nextEntry(unitSystem) ?: SetEntry(),
+            suggestion = suggestNextSet(history, unitSystem)
+        )
     }
 
     val navBackStackEntry by bottomBarNavController.currentBackStackEntryAsState()
@@ -145,13 +237,26 @@ fun MainAppContainer(
 
     // One shared backdrop for every tab, so switching tabs never flashes a new background.
     // Screens draw their own status-bar inset (top bars); the bottom bar handles the nav-bar inset.
+    val isOnline = rememberIsOnline()
     GlassBackground {
         Scaffold(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0.dp),
+            // Pushes content down instead of covering it; the banner takes over the status-bar inset
+            topBar = {
+                AnimatedVisibility(visible = !isOnline, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                    OfflineBanner()
+                }
+            },
             bottomBar = { if (showBottomBar) AppBottomNavigationBar(navController = bottomBarNavController) }
         ) { innerPadding ->
-            NavHost(navController = bottomBarNavController, startDestination = BottomNavItem.Sets.route, modifier = Modifier.padding(innerPadding)) {
+            NavHost(
+                navController = bottomBarNavController,
+                startDestination = BottomNavItem.Sets.route,
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .then(if (isOnline) Modifier else Modifier.consumeWindowInsets(WindowInsets.statusBars))
+            ) {
                 composable(BottomNavItem.Today.route) {
                     TodayScreen(
                         modifier = Modifier.fillMaxSize(),
@@ -166,7 +271,16 @@ fun MainAppContainer(
                                 userDataManager.loadSetsForDate(uid, selectedDate)
                             }
                         },
-                        onNavigateToExerciseDetail = ::openExercise
+                        onNavigateToExerciseDetail = ::openExercise,
+                        weeklyProgress = weeklyProgress,
+                        showDeloadReminder = weeklyProgress.deloadDue &&
+                            userDataManager.deloadReminderDismissedWeek != weeklyProgress.thisWeekKey,
+                        onSetDeloadWeek = { isDeload ->
+                            userDataManager.setDeloadWeek(weeklyProgress.thisWeekKey, isDeload, currentUser)
+                        },
+                        onDismissDeloadReminder = {
+                            userDataManager.dismissDeloadReminder(weeklyProgress.thisWeekKey, currentUser)
+                        }
                     )
                 }
                 composable(BottomNavItem.Sets.route) {
@@ -180,6 +294,12 @@ fun MainAppContainer(
                         userName = currentUser?.displayName,
                         onNavigateToExerciseList = { bottomBarNavController.navigate(AppRoutes.EXERCISE_LIST_SCREEN) },
                         onOpenPrograms = { bottomBarNavController.navigate(AppRoutes.PROGRAMS) },
+                        workoutCount = trainingHistory.workoutLogs.size,
+                        recordCount = trainingHistory.personalRecords.size,
+                        onOpenHistory = { bottomBarNavController.navigate(AppRoutes.WORKOUT_HISTORY) },
+                        onOpenRecords = { bottomBarNavController.navigate(AppRoutes.PERSONAL_RECORDS) },
+                        measurementCount = trainingHistory.measurements.size,
+                        onOpenBody = { bottomBarNavController.navigate(AppRoutes.BODY_MEASUREMENTS) },
                         recommendedProgramName = recommendedProgramId(userDataManager.userWeeklyGoalDays)
                             ?.let { id -> workoutPrograms.first { it.id == id }.name },
                         onNavigateToCreateNewList = { bottomBarNavController.navigate(AppRoutes.CREATE_NEW_LIST) },
@@ -205,6 +325,7 @@ fun MainAppContainer(
                         onNavigateBack = { bottomBarNavController.popBackStack() },
                         onDeleteExercise = { exerciseName -> userDataManager.deleteExerciseFromFirestore(exerciseName) },
                         onRecordExercise = recordSetAndStartTimerAction,
+                        prefillFor = ::prefillFor,
                         isTimerRunning = timerManager.isTimerRunning,
                         timerRemainingSeconds = timerManager.timerRemainingSeconds,
                         timerTotalSeconds = timerManager.timerTotalSeconds,
@@ -345,16 +466,12 @@ fun MainAppContainer(
                     val listName = backStackEntry.arguments?.getString("listName") ?: "Workout List"
 
                     val selectedList = userDataManager.userExerciseLists.find { it.id == listId }
-                    val exercisesForDetailScreen = selectedList?.exerciseIds?.mapNotNull { exerciseId ->
-                        val exerciseName = userDataManager.masterExerciseList.find { name -> exerciseIdOf(name) == exerciseId }
-                        exerciseName?.let(::displayInfoFor)
-                    } ?: emptyList()
 
                     ExerciseListDetailScreen(
                         // The route arg is the name at navigation time; prefer the live one so a rename shows
                         listName = selectedList?.name ?: listName,
-                        exercises = exercisesForDetailScreen,
-                        targetSets = selectedList?.targetSetsMin?.let { min -> min..(selectedList.targetSetsMax ?: min) },
+                        exercises = exercisesOf(selectedList),
+                        targetSets = targetSetsOf(selectedList),
                         setsDoneToday = setsDoneToday,
                         unitSystem = userDataManager.userUnitSystem,
                         isTimerRunning = timerManager.isTimerRunning,
@@ -369,7 +486,10 @@ fun MainAppContainer(
                         },
                         onOpenExercise = ::openExercise,
                         onRecordExercise = recordSetAndStartTimerAction,
-                        onRemoveExercise = { name -> userDataManager.removeExerciseFromList(listId, exerciseIdOf(name), currentUser) }
+                        prefillFor = ::prefillFor,
+                        onRemoveExercise = { name -> userDataManager.removeExerciseFromList(listId, exerciseIdOf(name), currentUser) },
+                        onReorderExercises = { ids -> userDataManager.updateListOrder(listId, ids, currentUser) },
+                        onStartWorkout = { bottomBarNavController.navigate(AppRoutes.WORKOUT.replace("{listId}", listId)) }
                     )
                 }
                 composable(
@@ -412,6 +532,98 @@ fun MainAppContainer(
                         onNavigateBack = { bottomBarNavController.popBackStack() }
                     )
                 }
+                composable(
+                    route = AppRoutes.WORKOUT,
+                    arguments = listOf(androidx.navigation.navArgument("listId") { type = androidx.navigation.NavType.StringType })
+                ) { backStackEntry ->
+                    val workoutList = userDataManager.userExerciseLists.find { it.id == backStackEntry.arguments?.getString("listId") }
+                    WorkoutScreen(
+                        listName = workoutList?.name ?: "Workout",
+                        exercises = exercisesOf(workoutList),
+                        targetSets = targetSetsOf(workoutList),
+                        history = exerciseHistory,
+                        unitSystem = userDataManager.userUnitSystem,
+                        isTimerRunning = timerManager.isTimerRunning,
+                        timerRemainingSeconds = timerManager.timerRemainingSeconds,
+                        timerTotalSeconds = timerManager.timerTotalSeconds,
+                        onCloseTimer = { timerManager.stopRestTimer() },
+                        prefillFor = ::prefillFor,
+                        onRecordSet = ::logSet,
+                        onSaveWorkout = trainingHistory::saveWorkout,
+                        onFinish = { bottomBarNavController.popBackStack() }
+                    )
+                }
+                composable(AppRoutes.WORKOUT_HISTORY) {
+                    WorkoutHistoryScreen(
+                        logs = trainingHistory.workoutLogs,
+                        unitSystem = userDataManager.userUnitSystem,
+                        onOpenLog = { id -> bottomBarNavController.navigate(AppRoutes.WORKOUT_LOG.replace("{logId}", id)) },
+                        onBack = { bottomBarNavController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = AppRoutes.WORKOUT_LOG,
+                    arguments = listOf(androidx.navigation.navArgument("logId") { type = androidx.navigation.NavType.StringType })
+                ) { backStackEntry ->
+                    val logId = backStackEntry.arguments?.getString("logId")
+                    WorkoutLogScreen(
+                        log = trainingHistory.workoutLogs.find { it.id == logId },
+                        unitSystem = userDataManager.userUnitSystem,
+                        onDelete = {
+                            logId?.let(trainingHistory::deleteWorkout)
+                            bottomBarNavController.popBackStack()
+                        },
+                        onBack = { bottomBarNavController.popBackStack() }
+                    )
+                }
+                composable(AppRoutes.PERSONAL_RECORDS) {
+                    PersonalRecordsScreen(
+                        records = trainingHistory.personalRecords.values.toList(),
+                        unitSystem = userDataManager.userUnitSystem,
+                        onOpenExercise = ::openExercise,
+                        onDeleteRecord = trainingHistory::deleteRecord,
+                        onBack = { bottomBarNavController.popBackStack() }
+                    )
+                }
+                composable(AppRoutes.BODY_MEASUREMENTS) {
+                    fun openEntry(id: String) = bottomBarNavController.navigate(AppRoutes.MEASUREMENT_ENTRY.replace("{measurementId}", id))
+                    BodyMeasurementsScreen(
+                        measurements = trainingHistory.measurements,
+                        unitSystem = userDataManager.userUnitSystem,
+                        cadence = userDataManager.measurementCadence,
+                        onCadenceChange = { userDataManager.updateMeasurementCadence(it, currentUser) },
+                        onNew = { openEntry("new") },
+                        onOpen = ::openEntry,
+                        onBack = { bottomBarNavController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = AppRoutes.MEASUREMENT_ENTRY,
+                    arguments = listOf(androidx.navigation.navArgument("measurementId") { type = androidx.navigation.NavType.StringType })
+                ) { backStackEntry ->
+                    val measurementId = backStackEntry.arguments?.getString("measurementId")
+                    val existing = trainingHistory.measurements.find { it.id == measurementId }
+                    MeasurementEntryScreen(
+                        existing = existing,
+                        // Hints come from the session before this one, or the latest when adding a new one
+                        previous = trainingHistory.measurements.firstOrNull {
+                            it.id != measurementId && (existing == null || it.takenAtMillis < existing.takenAtMillis)
+                        },
+                        unitSystem = userDataManager.userUnitSystem,
+                        cadence = userDataManager.measurementCadence,
+                        onSave = { measurement ->
+                            trainingHistory.saveMeasurement(measurement)
+                            bottomBarNavController.popBackStack()
+                        },
+                        onDelete = existing?.let { entry ->
+                            {
+                                trainingHistory.deleteMeasurement(entry.id)
+                                bottomBarNavController.popBackStack()
+                            }
+                        },
+                        onBack = { bottomBarNavController.popBackStack() }
+                    )
+                }
                 composable(AppRoutes.AD_REWARDS_SCREEN) {
                     AdRewardsScreen(onNavigateBack = { bottomBarNavController.popBackStack() })
                 }
@@ -435,15 +647,20 @@ fun MainAppContainer(
                         isLoading = isHistoryLoading,
                         unitSystem = userDataManager.userUnitSystem,
                         onBack = { bottomBarNavController.popBackStack() },
-                        onRecordSet = { reps, weight, notes -> recordSetAndStartTimerAction(exerciseName, reps, weight, notes) },
-                        onUpdateSet = { set, reps, weight, notes ->
-                            userDataManager.updateSet(set.dateKey, set.docId, reps, weight, notes, currentUser, onDone = ::refreshHistory)
+                        onRecordSet = { entry -> recordSetAndStartTimerAction(exerciseName, entry) },
+                        onUpdateSet = { set, entry ->
+                            userDataManager.updateSet(set.dateKey, set.docId, entry, currentUser, onDone = ::refreshHistory)
                         },
                         onDeleteSet = { set -> userDataManager.deleteSet(set.dateKey, set.docId, currentUser, onDone = ::refreshHistory) }
                     )
                 }
             }
         }
+        PrCelebrationBanner(
+            celebration = celebration,
+            onDismiss = { celebration = null },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 

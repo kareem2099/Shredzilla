@@ -1,5 +1,6 @@
 package com.FreeRave.shredzilla.screens.today
 
+import com.FreeRave.shredzilla.utils.WeeklyProgress
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.FreeRave.shredzilla.models.RecordedSet
+import com.FreeRave.shredzilla.models.SetType
 import com.FreeRave.shredzilla.screens.calendar.CalendarSheet
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
 import com.FreeRave.shredzilla.ui.glass.GlassCard
@@ -55,6 +57,9 @@ import com.FreeRave.shredzilla.ui.glass.GlassTopBar
 import com.FreeRave.shredzilla.ui.glass.glassSurface
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 import com.FreeRave.shredzilla.ui.theme.glass
+import com.FreeRave.shredzilla.utils.formatSetLoad
+import com.FreeRave.shredzilla.utils.sidePrefix
+import com.FreeRave.shredzilla.utils.setDetailsLabel
 import com.FreeRave.shredzilla.utils.formatStoredWeight
 import com.FreeRave.shredzilla.utils.daysOfMonth
 import com.FreeRave.shredzilla.utils.startOfDay
@@ -90,7 +95,11 @@ fun TodayScreen(
     recordedSetsToday: List<RecordedSet>,
     unitSystem: UnitSystem,
     onDateSelected: (Date) -> Unit,
-    onNavigateToExerciseDetail: (String) -> Unit
+    onNavigateToExerciseDetail: (String) -> Unit,
+    weeklyProgress: WeeklyProgress,
+    showDeloadReminder: Boolean,
+    onSetDeloadWeek: (Boolean) -> Unit,
+    onDismissDeloadReminder: () -> Unit
 ) {
     val today = remember { startOfDay() }
     var selectedDay by rememberSaveable { mutableLongStateOf(today) }
@@ -137,6 +146,19 @@ fun TodayScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // The week view belongs to today; browsing an old day shows just that day
+            if (selectedDay == today) {
+                if (showDeloadReminder) {
+                    item {
+                        DeloadReminderCard(
+                            weeks = weeklyProgress.weeksSinceDeload,
+                            onMarkDeload = { onSetDeloadWeek(true) },
+                            onDismiss = onDismissDeloadReminder
+                        )
+                    }
+                }
+                item { WeeklyGoalCard(weeklyProgress, onToggleDeload = { onSetDeloadWeek(!weeklyProgress.isDeloadWeek) }) }
+            }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     GlassStatTile(Icons.Filled.Repeat, "Reps", totalReps.toString(), Modifier.weight(1f))
@@ -199,7 +221,9 @@ private fun ExerciseLogCard(
     onClick: () -> Unit
 ) {
     val palette = MaterialTheme.glass
-    val volume = remember(sets) { sets.sumOf { it.weight.toDouble() * it.reps }.roundToLong().toDouble() }
+    val volume = remember(sets) {
+        sets.filter { it.setType != SetType.WARMUP }.sumOf { it.weight.toDouble() * it.reps }.roundToLong().toDouble()
+    }
 
     GlassCard(
         modifier = Modifier
@@ -212,7 +236,12 @@ private fun ExerciseLogCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(exerciseName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
-                Text("Volume ${formatStoredWeight(volume, unitSystem)}", style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
+                Text(
+                    // Plate-counted sets are stored with 0 kg, so a machine-only card shows reps instead
+                    if (volume > 0) "Volume ${formatStoredWeight(volume, unitSystem)}" else "${sets.sumOf { it.reps }} reps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.contentMuted
+                )
             }
             GlassChip(text = "${sets.size} ${if (sets.size == 1) "set" else "sets"}")
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)
@@ -233,13 +262,14 @@ private fun SetRow(set: RecordedSet, unitSystem: UnitSystem) {
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            text = formatStoredWeight(set.weight.toDouble(), unitSystem),
+            text = sidePrefix(set.side) + formatSetLoad(set.weight.toDouble(), set.plates, unitSystem, set.bodyweight, set.perSide),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             color = palette.content
         )
         Text("  ×  ${set.reps} reps", style = MaterialTheme.typography.bodyLarge, color = palette.contentMuted)
-        set.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+        // Type and tempo first, then the user's own notes
+        listOfNotNull(setDetailsLabel(set.setType, set.tempo), set.notes?.takeIf { it.isNotBlank() }).joinToString(" · ").takeIf { it.isNotEmpty() }?.let { notes ->
             Text(
                 text = notes,
                 style = MaterialTheme.typography.bodySmall,
@@ -292,7 +322,11 @@ private fun TodayScreenPreview() {
             ),
             unitSystem = UnitSystem.METRIC,
             onDateSelected = {},
-            onNavigateToExerciseDetail = {}
+            onNavigateToExerciseDetail = {},
+            weeklyProgress = WeeklyProgress("2026-11-01", 2, 4, 3, 6, false),
+            showDeloadReminder = true,
+            onSetDeloadWeek = {},
+            onDismissDeloadReminder = {}
         )
     }
 }

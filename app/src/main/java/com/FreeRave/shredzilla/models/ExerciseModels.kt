@@ -16,8 +16,88 @@ data class LoggedSet(
     val reps: Int,
     val weightKg: Double,
     val notes: String,
-    val timestampMillis: Long
+    val timestampMillis: Long,
+    /** Set on weight-stack machines logged by plate count; [weightKg] is 0 then. */
+    val plates: Int? = null,
+    /** One leg / arm at a time; null for both sides together. */
+    val side: Side? = null,
+    /** Bodyweight exercise; [weightKg] is any weight added on top (0 for none). */
+    val bodyweight: Boolean = false,
+    val setType: SetType = SetType.NORMAL,
+    val tempo: Tempo = Tempo(),
+    /** Plate-loaded machine loaded on both sides; [weightKg] is the total of both. */
+    val perSide: Boolean = false
+) {
+    /** What the chart sums: kg for free weights, plates for stack machines, reps for bodyweight work. Warm-ups add nothing. */
+    val volume: Double get() = when {
+        setType == SetType.WARMUP -> 0.0
+        bodyweight -> reps.toDouble()
+        else -> reps * (plates?.toDouble() ?: weightKg)
+    }
+
+    /** Kilograms moved, for "Volume" labels; warm-ups don't count. */
+    val volumeKg: Double get() = if (setType == SetType.WARMUP) 0.0 else reps * weightKg
+}
+
+/** What kind of set it was. Warm-ups are logged but left out of set counts, volume and records. */
+enum class SetType(val label: String, private val stored: String) {
+    NORMAL("Normal", "normal"),
+    WARMUP("Warm-up", "warmup"),
+    REST_PAUSE("Rest-pause", "rest_pause"),
+    DROP("Drop set", "drop"),
+    FAILURE("To failure", "failure");
+
+    val storedValue: String get() = stored
+
+    companion object {
+        fun fromStored(value: String?): SetType = entries.find { it.stored == value } ?: NORMAL
+    }
+}
+
+/** Seconds spent lowering the weight and holding at the squeeze; null when not tracked. */
+data class Tempo(val eccentricSeconds: Int? = null, val pauseSeconds: Int? = null) {
+    val isSet: Boolean get() = eccentricSeconds != null || pauseSeconds != null
+}
+
+/**
+ * What the user enters for one set. [weight] is in the user's unit; weight-stack machines are
+ * logged as a [plates] count instead, and [weight] is ignored then. For [bodyweight] work
+ * [weight] is what's added on top, e.g. a plate held during back extensions.
+ */
+data class SetEntry(
+    val reps: Int = 1,
+    val weight: Double = 0.0,
+    val plates: Int? = null,
+    val notes: String = "",
+    val side: Side? = null,
+    val bodyweight: Boolean = false,
+    val setType: SetType = SetType.NORMAL,
+    val tempo: Tempo = Tempo(),
+    /** Plate-loaded on both sides: [weight] is still the total, the sheet shows half of it per side. */
+    val perSide: Boolean = false
 )
+
+/** For exercises trained one leg or arm at a time. Stored as "left" / "right" on the set. */
+enum class Side(val label: String, private val stored: String) {
+    LEFT("Left", "left"),
+    RIGHT("Right", "right");
+
+    val opposite: Side get() = if (this == LEFT) RIGHT else LEFT
+    val storedValue: String get() = stored
+
+    companion object {
+        fun fromStored(value: String?): Side? = entries.find { it.stored == value }
+    }
+}
+
+/**
+ * Sets as the user counts them: a left and a right set together make one, so "3 sets" of a
+ * single-leg exercise is three per leg.
+ */
+fun List<LoggedSet>.workingSetCount(): Int {
+    val working = filter { it.setType != SetType.WARMUP }
+    return working.count { it.side == null } + maxOf(working.count { it.side == Side.LEFT }, working.count { it.side == Side.RIGHT })
+}
 
 // Data class for an exercise item
 data class ExerciseItem(
@@ -101,7 +181,13 @@ data class RecordedSet(
     val notes: String? = null,
     val timestamp: Timestamp = Timestamp.now(),
     val exerciseId: String,
-    val firestoreDocId: String? = null
+    val firestoreDocId: String? = null,
+    val plates: Int? = null,
+    val side: Side? = null,
+    val bodyweight: Boolean = false,
+    val setType: SetType = SetType.NORMAL,
+    val tempo: Tempo = Tempo(),
+    val perSide: Boolean = false
 )
 
 /** Firestore document id / analytics key for an exercise name, e.g. "Bench Press" -> "bench_press". */

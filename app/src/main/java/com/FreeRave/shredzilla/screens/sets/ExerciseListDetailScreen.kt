@@ -1,5 +1,24 @@
 package com.FreeRave.shredzilla.screens.sets
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.Alignment
+import com.FreeRave.shredzilla.ui.glass.GlassFab
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.foundation.layout.padding
+import com.FreeRave.shredzilla.ui.theme.glass
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import com.FreeRave.shredzilla.models.SetEntry
+import com.FreeRave.shredzilla.utils.SetPrefill
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -36,7 +55,10 @@ import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 
 private enum class ListDialog { NONE, DELETE_LIST }
 
-/** A workout list: log sets straight from it, open an exercise, edit the list or delete it. */
+/**
+ * A workout list: log sets straight from it, open an exercise, drag exercises into the order
+ * they're done in, edit the list or delete it.
+ */
 @Composable
 fun ExerciseListDetailScreen(
     listName: String,
@@ -53,63 +75,120 @@ fun ExerciseListDetailScreen(
     onEditList: () -> Unit,
     onDeleteList: () -> Unit,
     onOpenExercise: (exerciseName: String) -> Unit,
-    onRecordExercise: (exerciseName: String, reps: Int, weight: Double, notes: String) -> Unit,
-    onRemoveExercise: (exerciseName: String) -> Unit
+    onRecordExercise: (exerciseName: String, entry: SetEntry) -> Unit,
+    /** Where a new set starts (the last one logged) and what to try next. */
+    prefillFor: (exerciseName: String) -> SetPrefill,
+    onRemoveExercise: (exerciseName: String) -> Unit,
+    /** The whole new order (exercise ids), once a drag ends. */
+    onReorderExercises: (exerciseIds: List<String>) -> Unit,
+    onStartWorkout: () -> Unit
 ) {
+    // Moved live while dragging, saved on release; a fresh list from Firestore replaces it
+    var order by remember(exercises) { mutableStateOf(exercises) }
+    val lazyListState = rememberLazyListState()
+    val haptics = LocalHapticFeedback.current
+    val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        val fromIndex = order.indexOfFirst { it.id == from.key }
+        val toIndex = order.indexOfFirst { it.id == to.key }
+        if (fromIndex >= 0 && toIndex >= 0) {
+            order = order.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+            haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+        }
+    }
     var exerciseToRecord by remember { mutableStateOf<String?>(null) }
     var exerciseToRemove by remember { mutableStateOf<String?>(null) }
     var dialog by remember { mutableStateOf(ListDialog.NONE) }
-    Column(modifier = Modifier.fillMaxSize()) {
-        GlassTopBar(
-            title = listName,
-            eyebrow = "${exercises.size} ${if (exercises.size == 1) "exercise" else "exercises"}",
-            onBack = onNavigateBack,
-            actions = {
-                GlassIconButton(Icons.Filled.Edit, contentDescription = "Edit list", onClick = onEditList)
-                GlassIconButton(Icons.Filled.DeleteOutline, contentDescription = "Delete list", onClick = { dialog = ListDialog.DELETE_LIST })
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            GlassTopBar(
+                title = listName,
+                eyebrow = "${exercises.size} ${if (exercises.size == 1) "exercise" else "exercises"}",
+                onBack = onNavigateBack,
+                actions = {
+                    GlassIconButton(Icons.Filled.Edit, contentDescription = "Edit list", onClick = onEditList)
+                    GlassIconButton(Icons.Filled.DeleteOutline, contentDescription = "Delete list", onClick = { dialog = ListDialog.DELETE_LIST })
+                }
+            )
+            if (isTimerRunning) {
+                RestTimerBar(remainingSeconds = timerRemainingSeconds, totalSeconds = timerTotalSeconds, onClose = onCloseTimer)
             }
-        )
-        if (isTimerRunning) {
-            RestTimerBar(remainingSeconds = timerRemainingSeconds, totalSeconds = timerTotalSeconds, onClose = onCloseTimer)
-        }
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            if (exercises.isEmpty()) {
-                item {
-                    GlassSettingsGroup {
-                        GlassSettingsRow(
-                            icon = Icons.AutoMirrored.Filled.PlaylistAdd,
-                            title = "This list is empty",
-                            subtitle = "Add exercises to start logging from here",
-                            onClick = onEditList
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (exercises.isEmpty()) {
+                    item {
+                        GlassSettingsGroup {
+                            GlassSettingsRow(
+                                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                title = "This list is empty",
+                                subtitle = "Add exercises to start logging from here",
+                                onClick = onEditList
+                            )
+                        }
+                    }
+                }
+                items(order, key = { it.id }) { exercise ->
+                    ReorderableItem(reorderState, key = exercise.id) { isDragging ->
+                        val lift by animateFloatAsState(if (isDragging) 1.03f else 1f, label = "dragLift")
+                        SwipableExerciseListItem(
+                            exerciseName = exercise.name,
+                            lastPerformed = exercise.lastPerformed,
+                            onDelete = { exerciseToRemove = exercise.name },
+                            onRecord = { exerciseToRecord = exercise.name },
+                            onClick = { onOpenExercise(exercise.name) },
+                            progress = targetSets?.let { target ->
+                                "${setsDoneToday[exercise.id] ?: 0} / ${setsRangeLabel(target.first, target.last)}"
+                            },
+                            progressDone = targetSets != null && (setsDoneToday[exercise.id] ?: 0) >= targetSets.first,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer { scaleX = lift; scaleY = lift },
+                            dragHandle = if (order.size > 1) {
+                                {
+                                    Icon(
+                                        Icons.Filled.DragIndicator,
+                                        contentDescription = "Reorder ${exercise.name}",
+                                        tint = MaterialTheme.glass.contentMuted,
+                                        modifier = Modifier
+                                            .draggableHandle(
+                                                onDragStarted = { haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate) },
+                                                onDragStopped = {
+                                                    haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                                    if (order.map { it.id } != exercises.map { it.id }) onReorderExercises(order.map { it.id })
+                                                }
+                                            )
+                                            .padding(horizontal = 6.dp, vertical = 10.dp)
+                                    )
+                                }
+                            } else null
                         )
                     }
                 }
             }
-            items(exercises, key = { it.id }) { exercise ->
-                SwipableExerciseListItem(
-                    exerciseName = exercise.name,
-                    lastPerformed = exercise.lastPerformed,
-                    onDelete = { exerciseToRemove = exercise.name },
-                    onRecord = { exerciseToRecord = exercise.name },
-                    onClick = { onOpenExercise(exercise.name) },
-                    progress = targetSets?.let { target ->
-                        "${setsDoneToday[exercise.id] ?: 0} / ${setsRangeLabel(target.first, target.last)}"
-                    },
-                    progressDone = targetSets != null && (setsDoneToday[exercise.id] ?: 0) >= targetSets.first,
-                    modifier = Modifier.fillMaxWidth().animateItem()
-                )
-            }
+        }
+        if (exercises.isNotEmpty()) {
+            GlassFab(
+                icon = Icons.Filled.PlayArrow,
+                text = "Start workout",
+                onClick = onStartWorkout,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(20.dp)
+            )
         }
     }
 
+    val prefill = exerciseToRecord?.let(prefillFor) ?: SetPrefill()
     RecordSetSheet(
         exerciseName = exerciseToRecord,
         unitSystem = unitSystem,
         onRecordSet = onRecordExercise,
+        initial = prefill.initial,
+        suggestion = prefill.suggestion,
         onDismiss = { exerciseToRecord = null }
     )
 
@@ -165,8 +244,11 @@ private fun ExerciseListDetailScreenPreview() {
             onEditList = {},
             onDeleteList = {},
             onOpenExercise = {},
-            onRecordExercise = { _, _, _, _ -> },
-            onRemoveExercise = {}
+            onRecordExercise = { _, _ -> },
+            prefillFor = { SetPrefill() },
+            onRemoveExercise = {},
+            onReorderExercises = {},
+            onStartWorkout = {}
         )
     }
 }

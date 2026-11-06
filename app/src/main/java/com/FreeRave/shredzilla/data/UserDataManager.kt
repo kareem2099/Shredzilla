@@ -10,11 +10,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import com.FreeRave.shredzilla.models.UserExerciseList
 import com.FreeRave.shredzilla.models.RecordedSet
+import com.FreeRave.shredzilla.models.MeasurementCadence
+import com.FreeRave.shredzilla.models.SetEntry
+import com.FreeRave.shredzilla.models.SetType
+import com.FreeRave.shredzilla.models.Side
 import com.FreeRave.shredzilla.screens.settings.ThemeSetting
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.ktx.firestore
@@ -61,6 +66,14 @@ class UserDataManager(
     var userUnitSystem by mutableStateOf(UnitSystem.METRIC)
     var userWorkoutReminderSetting by mutableStateOf("Never")
     var userWeeklyGoalDays by mutableStateOf<Int?>(null)
+    /** Week keys (first day of the week) the user marked as deload weeks. */
+    var deloadWeeks by mutableStateOf<Set<String>>(emptySet())
+        private set
+    /** The week the deload reminder was dismissed in, so it stays hidden for the rest of that week. */
+    var deloadReminderDismissedWeek by mutableStateOf<String?>(null)
+        private set
+    var measurementCadence by mutableStateOf(MeasurementCadence.WEEKLY)
+        private set
     var themePreferenceMale by mutableStateOf(ThemeSetting.SYSTEM)
     var themePreferenceFemale by mutableStateOf(ThemeSetting.SYSTEM)
     var userExerciseLists by mutableStateOf<List<UserExerciseList>>(emptyList())
@@ -96,6 +109,9 @@ class UserDataManager(
         userUnitSystem = UnitSystem.METRIC
         userWorkoutReminderSetting = "Never"
         userWeeklyGoalDays = null
+        deloadWeeks = emptySet()
+        deloadReminderDismissedWeek = null
+        measurementCadence = MeasurementCadence.WEEKLY
         themePreferenceMale = ThemeSetting.SYSTEM
         themePreferenceFemale = ThemeSetting.SYSTEM
         userExerciseLists = emptyList()
@@ -119,7 +135,14 @@ class UserDataManager(
         allDayKeys.chunked(DELETE_PARALLELISM).forEach { chunk ->
             chunk.map { key -> async { deleteCollection(days.document(key).collection("recordedSets")) } }.awaitAll()
         }
-        listOf(days, userDoc.collection("exerciseLists"), userDoc.collection("exercises")).forEach { deleteCollection(it) }
+        listOf(
+            days,
+            userDoc.collection("exerciseLists"),
+            userDoc.collection("exercises"),
+            userDoc.collection(TrainingHistoryStore.WORKOUTS),
+            userDoc.collection(TrainingHistoryStore.RECORDS),
+            userDoc.collection(TrainingHistoryStore.MEASUREMENTS)
+        ).forEach { deleteCollection(it) }
         userDoc.delete().await()
     }
 
@@ -184,6 +207,10 @@ class UserDataManager(
                             .takeIf { it >= 0 }?.plus(1)
                         userDocSnapshot.getString("workoutReminder")
                             ?.let { userWorkoutReminderSetting = it }
+                        @Suppress("UNCHECKED_CAST")
+                        deloadWeeks = (userDocSnapshot.get("deloadWeeks") as? List<String>).orEmpty().toSet()
+                        deloadReminderDismissedWeek = userDocSnapshot.getString("deloadReminderDismissedWeek")
+                        measurementCadence = MeasurementCadence.fromStored(userDocSnapshot.getString("measurementCadence"))
 
                         val oldThemeMale = themePreferenceMale
                         val oldThemeFemale = themePreferenceFemale
@@ -289,7 +316,7 @@ class UserDataManager(
                         val reps = doc.getLong("reps")?.toInt() ?: 0
                         val weight = doc.getDouble("weight")?.toFloat() ?: 0.0f
                         val notes = doc.getString("notes")
-                        val ts = doc.getTimestamp("timestamp") ?: Timestamp.now()
+                        val ts = doc.getTimestamp("timestamp", DocumentSnapshot.ServerTimestampBehavior.ESTIMATE) ?: Timestamp.now()
                         currentSets.add(
                             RecordedSet(
                                 exerciseName = exName,
@@ -299,12 +326,21 @@ class UserDataManager(
                                 notes = notes,
                                 timestamp = ts,
                                 exerciseId = exId,
-                                firestoreDocId = doc.id
+                                firestoreDocId = doc.id,
+                                plates = doc.getLong("plates")?.toInt(),
+                                side = Side.fromStored(doc.getString("side")),
+                                bodyweight = doc.getBoolean("bodyweight") ?: false,
+                                setType = SetDocFields.setTypeOf(doc),
+                                tempo = SetDocFields.tempoOf(doc),
+                                perSide = SetDocFields.perSideOf(doc)
                             )
                         )
-                        repsCount += reps; setsCount++; if (exName.isNotBlank()) uniqueExNames.add(
-                        exName
-                    )
+                        // Warm-ups are logged but don't count towards the day's totals
+                        if (SetDocFields.setTypeOf(doc) != SetType.WARMUP) {
+                            repsCount += reps
+                            setsCount++
+                        }
+                        if (exName.isNotBlank()) uniqueExNames.add(exName)
                     }
                     todayRecordedSetsList = currentSets
                     todayTotalReps = repsCount; todayTotalSets = setsCount; todayUniqueExercises =
@@ -322,18 +358,10 @@ class UserDataManager(
         val userId = libraryUserId
         if (trimmedName.isNotBlank() && userId != null) {
             val exerciseDocRef = userExercisesCollection(userId).document(exerciseIdOf(trimmedName))
-            db.runTransaction { transaction ->
-                val snapshot = transaction.get(exerciseDocRef)
-                if (!snapshot.exists()) {
-                    transaction.set(
-                        exerciseDocRef,
-                        mapOf("name" to trimmedName, "createdAt" to FieldValue.serverTimestamp())
-                    )
-                }
-                null
-            }.addOnFailureListener { e ->
-                Log.w("Firestore", "Error adding exercise '$trimmedName' to library of $userId", e)
-            }
+            // A merge write instead of a transaction: transactions need the server, merge writes are
+            // queued offline. The id is derived from the name, so adding twice just rewrites the name.
+            exerciseDocRef.set(mapOf("name" to trimmedName), SetOptions.merge())
+                .addOnFailureListener { e -> Log.w("Firestore", "Error adding exercise '$trimmedName' to library of $userId", e) }
         } else if (userId == null) {
             Log.w("Firestore", "No signed-in user; not adding exercise '$trimmedName'.")
         }
@@ -464,12 +492,10 @@ class UserDataManager(
             .collection("dailyActivity").document(dateKey)
             .collection("recordedSets")
 
-    /** [weightInput] is in the user's unit; it's stored in kg. [onSaved] fires once Firestore confirms. */
+    /** [onSaved] fires as soon as the set is in the local cache (online or not). */
     fun recordSet(
         exerciseName: String,
-        reps: Int,
-        weightInput: Double,
-        notes: String,
+        entry: SetEntry,
         currentUser: FirebaseUser?,
         onSaved: () -> Unit = {}
     ) {
@@ -482,49 +508,57 @@ class UserDataManager(
         lastPerformedTimestampsMap[exId] = ts
         userDocRef.set(mapOf("lastPerformedTimestamps" to mapOf(exId to ts)), SetOptions.merge())
 
-        val setData = hashMapOf(
+        val setData = hashMapOf<String, Any>(
             "exerciseName" to exerciseName,
             "exerciseId" to exId,
-            "reps" to reps,
-            "weight" to convertToStorageWeight(weightInput), // always kg
-            "notes" to notes,
             "timestamp" to ts
-        )
+        ) + storedFieldsOf(entry)
         val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(ts.toDate())
         // The day document must exist too: Firestore can't list days that only have a subcollection
         userDocRef.collection("dailyActivity").document(dateKey).set(mapOf("date" to dateKey), SetOptions.merge())
         // Offline, Firestore keeps the write and syncs later; the today listener shows it immediately
         setsCollection(userId, dateKey).add(setData)
-            .addOnSuccessListener { onSaved() }
             .addOnFailureListener { e -> Log.e("Firestore", "Error recording set for $exerciseName", e) }
+        // Writes land in the local cache synchronously; waiting for the server would hang offline
+        onSaved()
     }
 
     fun deleteSet(dateKey: String, docId: String, currentUser: FirebaseUser?, onDone: () -> Unit = {}) {
         val userId = currentUser?.uid ?: return
         setsCollection(userId, dateKey).document(docId).delete()
-            .addOnSuccessListener { onDone() }
             .addOnFailureListener { e -> Log.e("Firestore", "Error deleting set $docId", e) }
+        onDone() // already applied locally, see recordSet
     }
 
-    /** [weightInput] is in the user's unit; it's stored in kg. */
     fun updateSet(
         dateKey: String,
         docId: String,
-        reps: Int,
-        weightInput: Double,
-        notes: String,
+        entry: SetEntry,
         currentUser: FirebaseUser?,
         onDone: () -> Unit = {}
     ) {
         val userId = currentUser?.uid ?: return
-        val changes = mapOf(
-            "reps" to reps.toLong(),
-            "weight" to convertToStorageWeight(weightInput),
-            "notes" to notes
-        )
+        // Switching a set back from plates to kg (or to both sides) must drop the old field
+        val changes = storedFieldsOf(entry) +
+            ("plates" to (entry.plates ?: FieldValue.delete())) +
+            ("side" to (entry.side?.storedValue ?: FieldValue.delete())) +
+            ("bodyweight" to (if (entry.bodyweight) true else FieldValue.delete())) +
+            SetDocFields.CLEARABLE.associateWith { FieldValue.delete() } +
+            SetDocFields.extrasOf(entry)
         setsCollection(userId, dateKey).document(docId).update(changes)
-            .addOnSuccessListener { onDone() }
             .addOnFailureListener { e -> Log.e("Firestore", "Error updating set $docId", e) }
+        onDone() // already applied locally, see recordSet
+    }
+
+    /** Set fields as stored: weight always in kg, and 0 for plate-counted sets. */
+    private fun storedFieldsOf(entry: SetEntry): Map<String, Any> = buildMap {
+        put("reps", entry.reps.toLong())
+        put("weight", if (entry.plates != null) 0.0 else convertToStorageWeight(entry.weight))
+        put("notes", entry.notes)
+        entry.plates?.let { put("plates", it.toLong()) }
+        entry.side?.let { put("side", it.storedValue) }
+        if (entry.bodyweight) put("bodyweight", true)
+        putAll(SetDocFields.extrasOf(entry))
     }
 
     // DRY Helper for settings updates
@@ -533,6 +567,20 @@ class UserDataManager(
         db.collection("users").document(userId).set(hashMapOf(key to value), SetOptions.merge())
             .addOnFailureListener { e -> Log.e("Firestore", "Failed to update setting $key", e) }
     }
+
+    fun setDeloadWeek(weekKey: String, isDeload: Boolean, currentUser: FirebaseUser?) {
+        updateUserSetting(
+            currentUser?.uid,
+            "deloadWeeks",
+            if (isDeload) FieldValue.arrayUnion(weekKey) else FieldValue.arrayRemove(weekKey)
+        )
+    }
+
+    fun dismissDeloadReminder(weekKey: String, currentUser: FirebaseUser?) =
+        updateUserSetting(currentUser?.uid, "deloadReminderDismissedWeek", weekKey)
+
+    fun updateMeasurementCadence(cadence: MeasurementCadence, currentUser: FirebaseUser?) =
+        updateUserSetting(currentUser?.uid, "measurementCadence", cadence.storedValue)
 
     // DRY Helper for unit conversion
     private fun convertToStorageWeight(displayWeight: Double): Double = displayToKg(displayWeight, userUnitSystem)
@@ -576,6 +624,15 @@ class UserDataManager(
         currentUser?.uid?.let { userId ->
             db.collection("users").document(userId).collection("exerciseLists").document(listId)
                 .update("exerciseIds", FieldValue.arrayRemove(exerciseIdToDelete))
+        }
+    }
+
+    /** Saves the order the user dragged the list's exercises into. */
+    fun updateListOrder(listId: String, exerciseIds: List<String>, currentUser: FirebaseUser?) {
+        currentUser?.uid?.let { userId ->
+            db.collection("users").document(userId).collection("exerciseLists").document(listId)
+                .update("exerciseIds", exerciseIds)
+                .addOnFailureListener { e -> Log.e("Firestore", "Error reordering list $listId", e) }
         }
     }
 

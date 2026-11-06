@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.exercises
 
+import com.FreeRave.shredzilla.models.SetEntry
+import com.FreeRave.shredzilla.utils.SetPrefill
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,7 +64,9 @@ fun ExercisesScreen(
     onNavigateToAddExercise: () -> Unit,
     onNavigateBack: () -> Unit,
     onDeleteExercise: (String) -> Unit,
-    onRecordExercise: (exerciseName: String, reps: Int, weight: Double, notes: String) -> Unit,
+    onRecordExercise: (exerciseName: String, entry: SetEntry) -> Unit,
+    /** Where a new set starts (the last one logged) and what to try next. */
+    prefillFor: (exerciseName: String) -> SetPrefill,
     isTimerRunning: Boolean,
     timerRemainingSeconds: Int,
     timerTotalSeconds: Int,
@@ -137,10 +141,13 @@ fun ExercisesScreen(
         )
     }
 
+    val prefill = exerciseToRecord?.let(prefillFor) ?: SetPrefill()
     RecordSetSheet(
         exerciseName = exerciseToRecord,
         unitSystem = unitSystem,
         onRecordSet = onRecordExercise,
+        initial = prefill.initial,
+        suggestion = prefill.suggestion,
         onDismiss = { exerciseToRecord = null }
     )
 
@@ -201,7 +208,8 @@ private fun ExercisesScreenPreview() {
             onNavigateToAddExercise = {},
             onNavigateBack = {},
             onDeleteExercise = {},
-            onRecordExercise = { _, _, _, _ -> },
+            onRecordExercise = { _, _ -> },
+            prefillFor = { SetPrefill() },
             isTimerRunning = true,
             timerRemainingSeconds = 30,
             timerTotalSeconds = 60,

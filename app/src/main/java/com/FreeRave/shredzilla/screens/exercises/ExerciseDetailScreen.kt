@@ -1,5 +1,6 @@
 package com.FreeRave.shredzilla.screens.exercises
 
+import com.FreeRave.shredzilla.models.SetEntry
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,15 +58,22 @@ import com.FreeRave.shredzilla.ui.glass.glassSurface
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 import com.FreeRave.shredzilla.ui.theme.glass
 import com.FreeRave.shredzilla.utils.formatStoredWeight
-import com.FreeRave.shredzilla.utils.kgToDisplay
+import com.FreeRave.shredzilla.utils.formatWeightNumber
+import com.FreeRave.shredzilla.utils.formatSetLoad
+import com.FreeRave.shredzilla.utils.platesLabel
+import com.FreeRave.shredzilla.utils.toEntry
+import com.FreeRave.shredzilla.utils.nextEntry
+import com.FreeRave.shredzilla.utils.sidePrefix
+import com.FreeRave.shredzilla.utils.setDetailsLabel
+import com.FreeRave.shredzilla.utils.suggestNextSet
+import com.FreeRave.shredzilla.utils.personalRecordIds
 import com.FreeRave.shredzilla.viewmodels.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-/** Epley estimate of a one-rep max from any set: weight × (1 + reps / 30). */
-private fun estimatedOneRepMaxKg(set: LoggedSet): Double =
-    if (set.reps <= 1) set.weightKg else set.weightKg * (1 + set.reps / 30.0)
+/** Epley estimate of a one-rep max: load × (1 + reps / 30). Works for kg and for plate counts alike. */
+private fun estimatedOneRepMax(load: Double, reps: Int): Double = if (reps <= 1) load else load * (1 + reps / 30.0)
 
 private fun dayLabel(dateKey: String): String {
     val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateKey) ?: return dateKey
@@ -92,8 +100,8 @@ fun ExerciseDetailScreen(
     isLoading: Boolean,
     unitSystem: UnitSystem,
     onBack: () -> Unit,
-    onRecordSet: (reps: Int, weight: Double, notes: String) -> Unit,
-    onUpdateSet: (set: LoggedSet, reps: Int, weight: Double, notes: String) -> Unit,
+    onRecordSet: (SetEntry) -> Unit,
+    onUpdateSet: (set: LoggedSet, entry: SetEntry) -> Unit,
     onDeleteSet: (LoggedSet) -> Unit
 ) {
     // The set being edited while the sheet is open; null means logging a new one
@@ -102,8 +110,15 @@ fun ExerciseDetailScreen(
     var setToDelete by remember { mutableStateOf<LoggedSet?>(null) }
 
     val sessions = remember(history) { history.groupBy { it.dateKey } } // newest day first
-    val bestSet = remember(history) { history.maxByOrNull { it.weightKg } }
-    val bestOneRepMax = remember(history) { history.maxOfOrNull(::estimatedOneRepMaxKg) }
+    // Plate counts aren't kilograms, so kg stats only look at weighted sets
+    val weightedSets = remember(history) { history.filter { it.plates == null && !it.bodyweight } }
+    val bestSet = remember(history) { weightedSets.maxByOrNull { it.weightKg } }
+    val mostPlates = remember(history) { history.mapNotNull { it.plates }.maxOrNull() }
+    val bestOneRepMaxKg = remember(history) { weightedSets.maxOfOrNull { estimatedOneRepMax(it.weightKg, it.reps) } }
+    val bestOneRepMaxPlates = remember(history) {
+        history.mapNotNull { set -> set.plates?.let { estimatedOneRepMax(it.toDouble(), set.reps) } }.maxOrNull()
+    }
+    val recordIds = remember(history) { personalRecordIds(history) }
 
     fun openSheet(editing: LoggedSet?) {
         sheetFor = editing
@@ -122,14 +137,20 @@ fun ExerciseDetailScreen(
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         GlassStatTile(Icons.Filled.EventAvailable, "Sessions", sessions.size.toString(), Modifier.weight(1f))
+                        // Bodyweight-only exercises have no heaviest load; their best is the most reps
+                        val heaviest = bestSet?.let { formatStoredWeight(it.weightKg, unitSystem) } ?: mostPlates?.let(::platesLabel)
+                        val mostReps = history.filter { it.bodyweight }.maxOfOrNull { it.reps }
                         GlassStatTile(
-                            Icons.Filled.FitnessCenter, "Heaviest",
-                            bestSet?.let { formatStoredWeight(it.weightKg, unitSystem) } ?: "—",
+                            Icons.Filled.FitnessCenter,
+                            if (heaviest == null && mostReps != null) "Most reps" else "Heaviest",
+                            heaviest ?: mostReps?.toString() ?: "—",
                             Modifier.weight(1f)
                         )
                         GlassStatTile(
                             Icons.Filled.EmojiEvents, "Est. 1RM",
-                            bestOneRepMax?.let { formatStoredWeight(it, unitSystem) } ?: "—",
+                            bestOneRepMaxKg?.let { formatStoredWeight(it, unitSystem) }
+                                ?: bestOneRepMaxPlates?.let { "${formatWeightNumber(it)} plates" }
+                                ?: "—",
                             Modifier.weight(1f)
                         )
                     }
@@ -163,6 +184,7 @@ fun ExerciseDetailScreen(
                             dateKey = dateKey,
                             sets = sets.sortedBy { it.timestampMillis },
                             unitSystem = unitSystem,
+                            recordIds = recordIds,
                             onEdit = ::openSheet,
                             onDelete = { setToDelete = it }
                         )
@@ -186,12 +208,11 @@ fun ExerciseDetailScreen(
         exerciseName = exerciseName.takeIf { isSheetOpen },
         unitSystem = unitSystem,
         isEditing = editing != null,
-        initialReps = editing?.reps ?: 1,
-        // Stored in kg; the sheet works in the user's unit. New sets start from the heaviest so far.
-        initialWeight = (editing ?: bestSet)?.let { kgToDisplay(it.weightKg, unitSystem) } ?: 0.0,
-        initialNotes = editing?.notes.orEmpty(),
-        onRecordSet = { _, reps, weight, notes ->
-            if (editing != null) onUpdateSet(editing, reps, weight, notes) else onRecordSet(reps, weight, notes)
+        // New sets start from the latest one (other side for one-sided work), so the load is ready to go
+        initial = editing?.toEntry(unitSystem) ?: history.firstOrNull()?.nextEntry(unitSystem) ?: SetEntry(),
+        suggestion = remember(history) { suggestNextSet(history, unitSystem) },
+        onRecordSet = { _, entry ->
+            if (editing != null) onUpdateSet(editing, entry) else onRecordSet(entry)
         },
         onDismiss = { isSheetOpen = false; sheetFor = null }
     )
@@ -199,7 +220,7 @@ fun ExerciseDetailScreen(
     setToDelete?.let { set ->
         GlassDialog(
             title = "Delete this set?",
-            message = "${set.reps} reps × ${formatStoredWeight(set.weightKg, unitSystem)} on ${dayLabel(set.dateKey)}. This can't be undone.",
+            message = "${set.reps} reps × ${formatSetLoad(set.weightKg, set.plates, unitSystem, set.bodyweight, set.perSide)} on ${dayLabel(set.dateKey)}. This can't be undone.",
             confirmText = "Delete",
             destructive = true,
             icon = rememberVectorPainter(Icons.Filled.DeleteOutline),
@@ -239,15 +260,20 @@ private fun SessionCard(
     dateKey: String,
     sets: List<LoggedSet>,
     unitSystem: UnitSystem,
+    recordIds: Set<String>,
     onEdit: (LoggedSet) -> Unit,
     onDelete: (LoggedSet) -> Unit
 ) {
     val palette = MaterialTheme.glass
-    val volumeKg = sets.sumOf { it.reps * it.weightKg }
+    val volumeKg = sets.sumOf { it.volumeKg }
     GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(dayLabel(dateKey), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = palette.content, modifier = Modifier.weight(1f))
-            Text("Volume ${formatStoredWeight(volumeKg, unitSystem)}", style = MaterialTheme.typography.labelMedium, color = palette.contentMuted)
+            Text(
+                if (volumeKg > 0) "Volume ${formatStoredWeight(volumeKg, unitSystem)}" else "${sets.size} sets",
+                style = MaterialTheme.typography.labelMedium,
+                color = palette.contentMuted
+            )
         }
         sets.forEachIndexed { index, set ->
             Row(
@@ -262,12 +288,20 @@ private fun SessionCard(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "${formatStoredWeight(set.weightKg, unitSystem)}  ×  ${set.reps} reps",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = palette.content
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "${sidePrefix(set.side)}${formatSetLoad(set.weightKg, set.plates, unitSystem, set.bodyweight, set.perSide)}  ×  ${set.reps} reps",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.content
+                        )
+                        if (set.docId in recordIds) {
+                            Icon(Icons.Filled.EmojiEvents, contentDescription = "Personal record", tint = palette.accent, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    setDetailsLabel(set.setType, set.tempo)?.let { details ->
+                        Text(details, style = MaterialTheme.typography.labelMedium, color = palette.accent)
+                    }
                     if (set.notes.isNotBlank()) {
                         Text(set.notes, style = MaterialTheme.typography.bodySmall, color = palette.contentMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
@@ -311,8 +345,8 @@ private fun ExerciseDetailScreenPreview() {
             isLoading = false,
             unitSystem = UnitSystem.METRIC,
             onBack = {},
-            onRecordSet = { _, _, _ -> },
-            onUpdateSet = { _, _, _, _ -> },
+            onRecordSet = {},
+            onUpdateSet = { _, _ -> },
             onDeleteSet = {}
         )
     }

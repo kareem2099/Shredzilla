@@ -1,6 +1,12 @@
 package com.FreeRave.shredzilla.screens.exercises
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import com.FreeRave.shredzilla.models.CatalogGroup
+import com.FreeRave.shredzilla.models.exerciseCatalog
+import com.FreeRave.shredzilla.ui.glass.GlassFilterChip
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,13 +37,9 @@ import com.FreeRave.shredzilla.ui.glass.GlassSubpageScaffold
 import com.FreeRave.shredzilla.ui.theme.ShredzillaTheme
 import com.FreeRave.shredzilla.ui.theme.glass
 
-private val PopularExercises = listOf(
-    "Bench Press", "Squat", "Deadlift", "Lat Pulldown", "Incline Dumbbell Press",
-    "Leg Extension", "Incline Bench Press", "Pull-up", "Overhead Press", "Barbell Row"
-)
-
 /**
- * Grow the library: tick popular exercises and add them together, or type a new name and create it.
+ * Grow the library: browse the catalog by muscle, tick exercises and add them together, or type a
+ * new name and create it.
  * Nothing is saved until the user confirms, and exercises already in the library can't be re-added.
  */
 @Composable
@@ -49,12 +51,20 @@ fun AddExerciseScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var selected by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var muscle by rememberSaveable { mutableStateOf<String?>(null) }
     val palette = MaterialTheme.glass
 
     fun inLibrary(name: String) = libraryExercises.any { it.equals(name, ignoreCase = true) }
     val typedName = query.trim()
     val canCreate = typedName.isNotEmpty() && !inLibrary(typedName)
-    val suggestions = PopularExercises.filter { it.contains(typedName, ignoreCase = true) }
+    // Typing searches every group; otherwise the chosen muscle (or all) is shown by group
+    val groups = when {
+        typedName.isNotEmpty() -> listOf(
+            CatalogGroup("Matches", exerciseCatalog.flatMap { it.exercises }.distinct().filter { it.contains(typedName, ignoreCase = true) })
+        )
+        muscle != null -> exerciseCatalog.filter { it.muscle == muscle }
+        else -> exerciseCatalog
+    }.filter { it.exercises.isNotEmpty() }
 
     GlassSubpageScaffold(
         title = "Add exercise",
@@ -83,34 +93,45 @@ fun AddExerciseScreen(
             typedName.isNotEmpty() -> GlassFootnote("\"$typedName\" is already in your library.")
         }
 
-        if (suggestions.isNotEmpty()) {
+        if (typedName.isEmpty()) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GlassFilterChip(text = "All", selected = muscle == null, onClick = { muscle = null })
+                exerciseCatalog.forEach { group ->
+                    GlassFilterChip(text = group.muscle, selected = muscle == group.muscle, onClick = { muscle = group.muscle })
+                }
+            }
+        }
+
+        groups.forEach { group ->
             Text(
-                "POPULAR",
+                group.muscle.uppercase(),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = palette.contentMuted,
                 modifier = Modifier.padding(start = 8.dp, top = 6.dp)
             )
-        }
-        suggestions.forEach { name ->
-            val alreadyAdded = inLibrary(name)
-            val isSelected = name in selected
-            GlassSelectableCard(
-                selected = isSelected,
-                role = Role.Checkbox,
-                onClick = { if (!alreadyAdded) selected = if (isSelected) selected - name else selected + name },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
+            group.exercises.forEach { name ->
+                val alreadyAdded = inLibrary(name)
+                val isSelected = name in selected
+                GlassSelectableCard(
+                    selected = isSelected,
+                    role = Role.Checkbox,
+                    onClick = { if (!alreadyAdded) selected = if (isSelected) selected - name else selected + name },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
                         name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (alreadyAdded) palette.contentMuted else palette.content
+                        color = if (alreadyAdded) palette.contentMuted else palette.content,
+                        modifier = Modifier.weight(1f)
                     )
+                    Spacer(Modifier.width(12.dp))
+                    if (alreadyAdded) GlassChip(text = "In library") else GlassSelectionIndicator(selected = isSelected)
                 }
-                Spacer(Modifier.width(12.dp))
-                if (alreadyAdded) GlassChip(text = "In library") else GlassSelectionIndicator(selected = isSelected)
             }
         }
     }
