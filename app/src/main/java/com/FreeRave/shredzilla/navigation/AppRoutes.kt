@@ -32,5 +32,7 @@ object AppRoutes {
     const val WORKOUT_HISTORY = "workout_history"
     const val WORKOUT_LOG = "workout_log/{logId}"
     const val PERSONAL_RECORDS = "personal_records"
+    const val BODY_MEASUREMENTS = "body_measurements"
+    const val MEASUREMENT_ENTRY = "measurement_entry/{measurementId}" // "new" for a new entry
     const val EXERCISE_DETAIL = "exercise_detail/{exerciseId}" // New route for individual exercise details
 }

@@ -1,6 +1,7 @@
 package com.FreeRave.shredzilla.viewmodels
 
 import com.FreeRave.shredzilla.models.LoggedSet
+import com.FreeRave.shredzilla.models.Side
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -8,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.FreeRave.shredzilla.data.SetDocFields
 import com.FreeRave.shredzilla.data.TrainingHistoryStore
 import com.FreeRave.shredzilla.data.UserDataManager
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
@@ -185,6 +187,11 @@ class MainViewModel(
                         weightKg = setDoc.getDouble("weight") ?: 0.0,
                         notes = setDoc.getString("notes").orEmpty(),
                         plates = setDoc.getLong("plates")?.toInt(),
+                        side = Side.fromStored(setDoc.getString("side")),
+                        bodyweight = setDoc.getBoolean("bodyweight") ?: false,
+                        setType = SetDocFields.setTypeOf(setDoc),
+                        tempo = SetDocFields.tempoOf(setDoc),
+                        perSide = SetDocFields.perSideOf(setDoc),
                         // Pending (unsynced) sets have no server timestamp yet; estimate it locally
                         timestampMillis = (setDoc.getTimestamp("timestamp", DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.seconds ?: 0L) * 1000L
                     )

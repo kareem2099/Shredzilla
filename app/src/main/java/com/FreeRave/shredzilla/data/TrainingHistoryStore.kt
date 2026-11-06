@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
+import com.FreeRave.shredzilla.models.BodyMeasurement
 import com.FreeRave.shredzilla.models.PersonalRecord
 import com.FreeRave.shredzilla.models.RecordSet
 import com.FreeRave.shredzilla.models.SetLoad
@@ -19,7 +20,7 @@ import com.google.firebase.firestore.SetOptions
 import java.util.Date
 
 /**
- * Finished workouts and all-time personal records. Both are live listeners, so they work from the
+ * Finished workouts, all-time personal records and body measurements. Both are live listeners, so they work from the
  * cache offline and writes sync later like everything else.
  */
 class TrainingHistoryStore(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
@@ -27,12 +28,16 @@ class TrainingHistoryStore(private val db: FirebaseFirestore = FirebaseFirestore
     companion object {
         const val WORKOUTS = "workouts"
         const val RECORDS = "records"
+        const val MEASUREMENTS = "measurements"
         private const val WORKOUT_HISTORY_LIMIT = 200L
     }
 
     var workoutLogs by mutableStateOf<List<WorkoutLog>>(emptyList())
         private set
     var personalRecords by mutableStateOf<Map<String, PersonalRecord>>(emptyMap())
+        private set
+    /** Newest first. */
+    var measurements by mutableStateOf<List<BodyMeasurement>>(emptyList())
         private set
     /** False until the first records snapshot, so nobody mistakes "not loaded" for "no records". */
     var recordsLoaded by mutableStateOf(false)
@@ -65,6 +70,15 @@ class TrainingHistoryStore(private val db: FirebaseFirestore = FirebaseFirestore
             personalRecords = snapshot?.documents?.mapNotNull(::personalRecordOf).orEmpty().associateBy { it.exerciseId }
             recordsLoaded = true
         }
+        listeners += userDoc(uid).collection(MEASUREMENTS)
+            .orderBy("takenAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.w("Firestore", "Measurements listen failed", e)
+                    return@addSnapshotListener
+                }
+                measurements = snapshot?.documents?.mapNotNull(::measurementOf).orEmpty()
+            }
     }
 
     fun reset() {
@@ -73,6 +87,7 @@ class TrainingHistoryStore(private val db: FirebaseFirestore = FirebaseFirestore
         userId = null
         workoutLogs = emptyList()
         personalRecords = emptyMap()
+        measurements = emptyList()
         recordsLoaded = false
     }
 
@@ -115,12 +130,51 @@ class TrainingHistoryStore(private val db: FirebaseFirestore = FirebaseFirestore
         userDoc(uid).collection(RECORDS).document(exerciseId).delete()
     }
 
+    /** New entries get an id; editing an existing one replaces it. */
+    fun saveMeasurement(measurement: BodyMeasurement) {
+        val uid = userId ?: return
+        val data = mapOf(
+            "takenAt" to Timestamp(Date(measurement.takenAtMillis)),
+            "values" to measurement.valuesCm,
+            "bodyWeightKg" to measurement.bodyWeightKg,
+            "note" to measurement.note
+        )
+        val collection = userDoc(uid).collection(MEASUREMENTS)
+        val doc = if (measurement.id.isEmpty()) collection.document() else collection.document(measurement.id)
+        doc.set(data).addOnFailureListener { e -> Log.e("Firestore", "Error saving measurement", e) }
+    }
+
+    fun deleteMeasurement(id: String) {
+        val uid = userId ?: return
+        userDoc(uid).collection(MEASUREMENTS).document(id).delete()
+    }
+
+    private fun measurementOf(doc: DocumentSnapshot): BodyMeasurement? {
+        val takenAt = doc.getTimestamp("takenAt") ?: return null
+        @Suppress("UNCHECKED_CAST")
+        val values = (doc.get("values") as? Map<String, Number>).orEmpty().mapValues { it.value.toDouble() }
+        return BodyMeasurement(doc.id, takenAt.toDate().time, values, doc.getDouble("bodyWeightKg"), doc.getString("note").orEmpty())
+    }
+
     private fun loadFields(load: SetLoad?): Map<String, Any?> =
-        if (load == null) emptyMap() else mapOf("weightKg" to load.weightKg, "plates" to load.plates, "reps" to load.reps)
+        if (load == null) emptyMap()
+        else mapOf(
+            "weightKg" to load.weightKg,
+            "plates" to load.plates,
+            "reps" to load.reps,
+            "bodyweight" to load.bodyweight,
+            "perSide" to load.perSide
+        )
 
     private fun Map<*, *>.toSetLoad(): SetLoad? {
         val reps = (this["reps"] as? Number)?.toInt() ?: return null
-        return SetLoad((this["weightKg"] as? Number)?.toDouble() ?: 0.0, (this["plates"] as? Number)?.toInt(), reps)
+        return SetLoad(
+            weightKg = (this["weightKg"] as? Number)?.toDouble() ?: 0.0,
+            plates = (this["plates"] as? Number)?.toInt(),
+            reps = reps,
+            bodyweight = this["bodyweight"] as? Boolean ?: false,
+            perSide = this["perSide"] as? Boolean ?: false
+        )
     }
 
     private fun workoutLogOf(doc: DocumentSnapshot): WorkoutLog? {

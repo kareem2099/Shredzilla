@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.workout
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.activity.compose.BackHandler
@@ -46,6 +48,12 @@ import com.FreeRave.shredzilla.models.WorkoutExerciseSummary
 import com.FreeRave.shredzilla.models.WorkoutLog
 import com.FreeRave.shredzilla.models.WorkoutPr
 import com.FreeRave.shredzilla.models.setLoad
+import com.FreeRave.shredzilla.models.SetType
+import com.FreeRave.shredzilla.utils.changeSinceLast
+import com.FreeRave.shredzilla.utils.sidePrefix
+import java.text.SimpleDateFormat
+import java.util.Locale
+import com.FreeRave.shredzilla.models.workingSetCount
 import com.FreeRave.shredzilla.screens.history.WorkoutLogContent
 import com.FreeRave.shredzilla.models.setsRangeLabel
 import com.FreeRave.shredzilla.screens.exercises.composables.RecordSetSheet
@@ -79,12 +87,12 @@ private fun buildWorkoutLog(
         listName = listName,
         startedAtMillis = startedAt,
         durationMillis = finishedAt - startedAt,
-        setCount = allSets.size,
-        volumeKg = allSets.sumOf { it.reps * it.weightKg }, // plate sets are stored with 0 kg
+        setCount = sessionSets.values.sumOf { it.workingSetCount() },
+        volumeKg = allSets.sumOf { it.volumeKg },
         exercises = exercises.map { exercise ->
             val sets = sessionSets[exercise.id].orEmpty()
             val best = sets.maxWithOrNull(compareBy<LoggedSet> { it.plates?.toDouble() ?: it.weightKg }.thenBy { it.reps })
-            WorkoutExerciseSummary(exercise.id, exercise.name, sets.size, best?.setLoad)
+            WorkoutExerciseSummary(exercise.id, exercise.name, sets.workingSetCount(), best?.setLoad)
         },
         records = exercises.flatMap { exercise ->
             sessionSets[exercise.id].orEmpty().filter { it.docId in recordIds }.map { WorkoutPr(exercise.name, it.setLoad) }
@@ -137,7 +145,7 @@ fun WorkoutScreen(
         }
     }
     val recordIds = remember(history, exercises) { exercises.flatMap { personalRecordIds(history[it.id].orEmpty()) }.toSet() }
-    val totalSessionSets = sessionSets.values.sumOf { it.size }
+    val totalSessionSets = sessionSets.values.sumOf { it.workingSetCount() }
 
     fun requestFinish() {
         when {
@@ -161,13 +169,23 @@ fun WorkoutScreen(
         }
     }
     val doneSets = sessionSets[exercise.id].orEmpty()
+    // The latest earlier session of this exercise, warm-ups left out, to beat set by set
+    val lastSession = remember(history, exercise.id) {
+        history[exercise.id].orEmpty()
+            .filter { it.timestampMillis < startedAt && it.setType != SetType.WARMUP }
+            .groupBy { it.dateKey }
+            .maxByOrNull { it.key }?.value
+            ?.sortedBy { it.timestampMillis }
+            .orEmpty()
+    }
     val partner = partnerOf(currentIndex)?.let(exercises::getOrNull)
     // A superset moves on as one block
     val blockEnd = maxOf(currentIndex, partnerOf(currentIndex) ?: currentIndex)
     val isLast = blockEnd >= exercises.lastIndex
     val nextExercise = exercises.getOrNull(blockEnd + 1)
-    val targetMet = targetSets != null && doneSets.size >= targetSets.first &&
-        (partner == null || sessionSets[partner.id].orEmpty().size >= targetSets.first)
+    val doneCount = doneSets.workingSetCount()
+    val targetMet = targetSets != null && doneCount >= targetSets.first &&
+        (partner == null || sessionSets[partner.id].orEmpty().workingSetCount() >= targetSets.first)
     val canLinkNext = partner == null && currentIndex < exercises.lastIndex && partnerOf(currentIndex + 1) == null
     val prefill = prefillFor(exercise.name)
 
@@ -184,7 +202,7 @@ fun WorkoutScreen(
         ExerciseStrip(
             exercises = exercises,
             currentIndex = currentIndex,
-            setsDone = { sessionSets[it].orEmpty().size },
+            setsDone = { sessionSets[it].orEmpty().workingSetCount() },
             isInSuperset = { partnerOf(it) != null },
             onSelect = { currentIndex = it }
         )
@@ -202,6 +220,7 @@ fun WorkoutScreen(
                 recordIds = recordIds,
                 suggestion = prefill.suggestion?.let { "Try ${formatEntry(it.next, unitSystem)} · last session ${formatEntry(it.basedOn, unitSystem)}" },
                 unitSystem = unitSystem,
+                lastSession = lastSession,
                 superset = {
                     when {
                         partner != null -> GlassFilterChip(
@@ -229,7 +248,11 @@ fun WorkoutScreen(
             when {
                 targetMet && isLast -> GlassPrimaryButton(text = "Finish workout", onClick = ::requestFinish)
                 targetMet -> GlassPrimaryButton(text = "Next: ${nextExercise?.name}", onClick = { currentIndex = blockEnd + 1 })
-                else -> GlassPrimaryButton(text = "Log set ${doneSets.size + 1}", onClick = { isSheetOpen = true })
+                else -> GlassPrimaryButton(
+                    // Mid-pair on a one-sided exercise, the next tap is the other side of the same set
+                    text = prefill.initial.side?.let { "Log ${it.label.lowercase()} side" } ?: "Log set ${doneCount + 1}",
+                    onClick = { isSheetOpen = true }
+                )
             }
             val secondary: Pair<String, () -> Unit>? = when {
                 targetMet -> "Log another set" to { isSheetOpen = true }
@@ -302,6 +325,7 @@ private fun ExerciseStrip(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CurrentExerciseCard(
     position: String,
@@ -311,6 +335,7 @@ private fun CurrentExerciseCard(
     recordIds: Set<String>,
     suggestion: String?,
     unitSystem: UnitSystem,
+    lastSession: List<LoggedSet>,
     superset: @Composable () -> Unit
 ) {
     val palette = MaterialTheme.glass
@@ -321,9 +346,9 @@ private fun CurrentExerciseCard(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (targetSets != null) {
-                GlassChip(text = "Target ${setsRangeLabel(targetSets.first, targetSets.last)}", highlighted = doneSets.size >= targetSets.first)
+                GlassChip(text = "Target ${setsRangeLabel(targetSets.first, targetSets.last)}", highlighted = doneSets.workingSetCount() >= targetSets.first)
             }
-            GlassChip(text = "${doneSets.size} done")
+            GlassChip(text = "${doneSets.workingSetCount()} done")
         }
         superset()
         if (suggestion != null) {
@@ -332,20 +357,50 @@ private fun CurrentExerciseCard(
                 Text(suggestion, style = MaterialTheme.typography.bodyMedium, color = palette.content)
             }
         }
+        if (lastSession.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "Last time · ${lastSessionLabel(lastSession.first().dateKey)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = palette.contentMuted
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    lastSession.forEach { set -> GlassChip(text = sidePrefix(set.side) + formatLoad(set.setLoad, unitSystem)) }
+                }
+            }
+        }
         if (doneSets.isEmpty()) {
             Text("No sets yet. Log your first one when you're ready.", style = MaterialTheme.typography.bodyMedium, color = palette.contentMuted)
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 doneSets.forEachIndexed { index, set ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Set ${index + 1}", style = MaterialTheme.typography.labelLarge, color = palette.contentMuted, modifier = Modifier.weight(0.3f))
+                        // Each side counts its own working sets: Set 1 · Left, Set 1 · Right…; warm-ups aren't numbered
+                        val isWarmup = set.setType == SetType.WARMUP
+                        val number = doneSets.take(index + 1).count { it.side == set.side && it.setType != SetType.WARMUP }
+                        val previous = if (isWarmup) null else lastSession.filter { it.side == set.side }.getOrNull(number - 1)
+                        Text(
+                            (if (isWarmup) "Warm-up" else "Set $number") + set.side?.let { " · ${it.label}" }.orEmpty(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = palette.contentMuted,
+                            modifier = Modifier.weight(0.4f)
+                        )
                         Text(
                             formatLoad(set.setLoad, unitSystem),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = palette.content,
-                            modifier = Modifier.weight(0.7f)
+                            modifier = Modifier.weight(0.6f)
                         )
+                        changeSinceLast(set, previous, unitSystem)?.let { change ->
+                            Text(
+                                change,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (change.startsWith("+")) palette.accent else palette.contentMuted,
+                                modifier = Modifier.padding(horizontal = 6.dp)
+                            )
+                        }
                         if (set.docId in recordIds) {
                             Icon(Icons.Filled.EmojiEvents, contentDescription = "Personal record", tint = palette.accent, modifier = Modifier.size(20.dp))
                         }
@@ -354,6 +409,11 @@ private fun CurrentExerciseCard(
             }
         }
     }
+}
+
+private fun lastSessionLabel(dateKey: String): String {
+    val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateKey) ?: return dateKey
+    return SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(date)
 }
 
 @Composable

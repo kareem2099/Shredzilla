@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.exercises.composables
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -39,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.FreeRave.shredzilla.auth.composables.TextFormField
 import com.FreeRave.shredzilla.models.SetEntry
+import com.FreeRave.shredzilla.models.SetType
+import com.FreeRave.shredzilla.models.Side
+import com.FreeRave.shredzilla.models.Tempo
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
 import com.FreeRave.shredzilla.ui.glass.GlassBottomSheet
 import com.FreeRave.shredzilla.ui.glass.GlassCard
@@ -51,13 +56,26 @@ import com.FreeRave.shredzilla.utils.formatWeightNumber
 import com.FreeRave.shredzilla.utils.SetSuggestion
 import com.FreeRave.shredzilla.utils.formatEntry
 import com.FreeRave.shredzilla.utils.platesLabel
+import com.FreeRave.shredzilla.utils.bodyweightLabel
 import com.FreeRave.shredzilla.utils.weightUnit
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 private const val MIN_REPS = 1
+
+/** How a set's load is counted: weight in the user's unit, plates on a stack, or bodyweight (plus any added weight). */
+private enum class LoadMode { WEIGHT, PLATES, BODYWEIGHT }
+
+private val SetEntry.loadMode: LoadMode
+    get() = when {
+        bodyweight -> LoadMode.BODYWEIGHT
+        plates != null -> LoadMode.PLATES
+        else -> LoadMode.WEIGHT
+    }
 private const val MIN_PLATES = 1
 private val WeightQuickSteps = listOf(-5.0, -2.5, 2.5, 5.0)
+private val EccentricOptions = listOf(null, 3, 5, 8)
+private val PauseOptions = listOf(null, 1, 2, 3)
 
 /**
  * Body of the "record a set" sheet, shared by the library, list detail and exercise detail.
@@ -76,10 +94,19 @@ fun RecordSetSheetContent(
     isEditing: Boolean = false
 ) {
     var reps by remember(initial) { mutableIntStateOf(initial.reps.coerceAtLeast(MIN_REPS)) }
-    var weight by remember(initial) { mutableDoubleStateOf(initial.weight) }
+    // Bar weight and added bodyweight load are kept apart, so switching modes never turns 60 kg into "BW + 60"
+    var weight by remember(initial) { mutableDoubleStateOf(if (initial.bodyweight) 0.0 else initial.weight) }
+    var addedWeight by remember(initial) { mutableDoubleStateOf(if (initial.bodyweight) initial.weight else 0.0) }
     var plates by remember(initial) { mutableIntStateOf(initial.plates ?: MIN_PLATES) }
-    var usePlates by remember(initial) { mutableStateOf(initial.plates != null) }
+    var mode by remember(initial) { mutableStateOf(initial.loadMode) }
     var notes by remember(initial) { mutableStateOf(initial.notes) }
+    var side by remember(initial) { mutableStateOf(initial.side) }
+    var setType by remember(initial) { mutableStateOf(initial.setType) }
+    var eccentric by remember(initial) { mutableStateOf(initial.tempo.eccentricSeconds) }
+    var pause by remember(initial) { mutableStateOf(initial.tempo.pauseSeconds) }
+    // Plate-loaded on both sides: [weight] stays the total, the user steps and reads one side
+    var perSide by remember(initial) { mutableStateOf(initial.perSide) }
+    val sideFactor = if (perSide) 2 else 1
     val palette = MaterialTheme.glass
 
     // Scrolls once the plate calculator is open on a short screen
@@ -101,12 +128,22 @@ fun RecordSetSheetContent(
             SuggestionCard(
                 suggestion = suggestion,
                 unitSystem = unitSystem,
-                applied = reps == next.reps && usePlates == (next.plates != null) &&
-                    (if (usePlates) plates == next.plates else weight == next.weight),
+                applied = reps == next.reps && mode == next.loadMode && when (mode) {
+                    LoadMode.WEIGHT -> weight == next.weight && perSide == next.perSide
+                    LoadMode.PLATES -> plates == next.plates
+                    LoadMode.BODYWEIGHT -> addedWeight == next.weight
+                },
                 onUse = {
                     reps = next.reps
-                    usePlates = next.plates != null
-                    next.plates?.let { plates = it } ?: run { weight = next.weight }
+                    mode = next.loadMode
+                    when (mode) {
+                        LoadMode.WEIGHT -> {
+                            weight = next.weight
+                            perSide = next.perSide
+                        }
+                        LoadMode.PLATES -> plates = next.plates ?: MIN_PLATES
+                        LoadMode.BODYWEIGHT -> addedWeight = next.weight
+                    }
                 }
             )
         }
@@ -115,34 +152,90 @@ fun RecordSetSheetContent(
             label = "Reps",
             valueText = reps.toString(),
             onMinus = { reps = (reps - 1).coerceAtLeast(MIN_REPS) },
-            onPlus = { reps++ }
-        )
-        StepperCard(
-            label = if (usePlates) "Plates" else "Weight",
-            valueText = if (usePlates) platesLabel(plates) else formatWeight(weight, unitSystem),
-            onMinus = { if (usePlates) plates = (plates - 1).coerceAtLeast(MIN_PLATES) else weight = (weight - 1).coerceAtLeast(0.0) },
-            onPlus = { if (usePlates) plates++ else weight += 1 },
+            onPlus = { reps++ },
+            // One leg / arm at a time: the next set starts on the other side by itself
             headerTrailing = {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    GlassFilterChip(text = unitSystem.weightUnit(), selected = !usePlates, onClick = { usePlates = false })
-                    GlassFilterChip(text = "Plates", selected = usePlates, onClick = { usePlates = true })
+                    GlassFilterChip(text = "Both", selected = side == null, onClick = { side = null })
+                    Side.entries.forEach { option ->
+                        GlassFilterChip(text = option.label, selected = side == option, onClick = { side = option })
+                    }
+                }
+            }
+        )
+        StepperCard(
+            label = "Load",
+            valueText = when (mode) {
+                LoadMode.WEIGHT -> if (perSide) "${formatWeight(weight / 2, unitSystem)}/side" else formatWeight(weight, unitSystem)
+                LoadMode.PLATES -> platesLabel(plates)
+                LoadMode.BODYWEIGHT -> bodyweightLabel(addedWeight, unitSystem, stored = false)
+            },
+            onMinus = {
+                when (mode) {
+                    LoadMode.WEIGHT -> weight = (weight - sideFactor).coerceAtLeast(0.0)
+                    LoadMode.PLATES -> plates = (plates - 1).coerceAtLeast(MIN_PLATES)
+                    LoadMode.BODYWEIGHT -> addedWeight = (addedWeight - 1).coerceAtLeast(0.0)
+                }
+            },
+            onPlus = {
+                when (mode) {
+                    LoadMode.WEIGHT -> weight += sideFactor
+                    LoadMode.PLATES -> plates++
+                    LoadMode.BODYWEIGHT -> addedWeight += 1
+                }
+            },
+            headerTrailing = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    GlassFilterChip(text = unitSystem.weightUnit(), selected = mode == LoadMode.WEIGHT, onClick = { mode = LoadMode.WEIGHT })
+                    GlassFilterChip(text = "Plates", selected = mode == LoadMode.PLATES, onClick = { mode = LoadMode.PLATES })
+                    GlassFilterChip(text = "Bodyweight", selected = mode == LoadMode.BODYWEIGHT, onClick = { mode = LoadMode.BODYWEIGHT })
                 }
             }
         ) {
-            if (!usePlates) {
+            if (mode == LoadMode.BODYWEIGHT) {
+                Text(
+                    "+ / − adds weight on top, e.g. a plate held during back extensions",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.contentMuted
+                )
+            }
+            if (mode != LoadMode.PLATES) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     WeightQuickSteps.forEach { step ->
                         GlassFilterChip(
                             text = "${if (step > 0) "+" else "−"}${formatWeightNumber(abs(step))}",
                             selected = false,
-                            onClick = { weight = (weight + step).coerceAtLeast(0.0) },
+                            onClick = {
+                                if (mode == LoadMode.BODYWEIGHT) addedWeight = (addedWeight + step).coerceAtLeast(0.0)
+                                else weight = (weight + step * sideFactor).coerceAtLeast(0.0)
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
-                PlateCalculator(weight = weight, unitSystem = unitSystem)
+                if (mode == LoadMode.WEIGHT) {
+                    GlassFilterChip(
+                        text = if (perSide) "Per side · total ${formatWeight(weight, unitSystem)}" else "Loaded per side?",
+                        selected = perSide,
+                        // Keeps the number on screen: 30 becomes 30 per side, not 15
+                        onClick = {
+                            weight = if (perSide) weight / 2 else weight * 2
+                            perSide = !perSide
+                        }
+                    )
+                    if (!perSide) PlateCalculator(weight = weight, unitSystem = unitSystem)
+                }
             }
         }
+
+        SetDetailsCard(
+            setType = setType,
+            onSetType = { setType = it },
+            eccentric = eccentric,
+            onEccentric = { eccentric = it },
+            pause = pause,
+            onPause = { pause = it }
+        )
 
         TextFormField(
             value = notes,
@@ -154,11 +247,68 @@ fun RecordSetSheetContent(
 
         GlassPrimaryButton(
             text = if (isEditing) "Update set" else "Record set",
-            onClick = { onRecordSet(SetEntry(reps, if (usePlates) 0.0 else weight, plates.takeIf { usePlates }, notes)) }
+            onClick = {
+                onRecordSet(
+                    SetEntry(
+                        reps = reps,
+                        weight = when (mode) {
+                            LoadMode.WEIGHT -> weight
+                            LoadMode.PLATES -> 0.0
+                            LoadMode.BODYWEIGHT -> addedWeight
+                        },
+                        plates = plates.takeIf { mode == LoadMode.PLATES },
+                        notes = notes,
+                        side = side,
+                        bodyweight = mode == LoadMode.BODYWEIGHT,
+                        setType = setType,
+                        tempo = Tempo(eccentric, pause),
+                        perSide = perSide && mode == LoadMode.WEIGHT
+                    )
+                )
+            }
         )
         TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Cancel", color = palette.contentMuted)
         }
+    }
+}
+
+/** Set type (warm-up, rest-pause…) and tempo; the next set starts from the same tempo. */
+@Composable
+private fun SetDetailsCard(
+    setType: SetType,
+    onSetType: (SetType) -> Unit,
+    eccentric: Int?,
+    onEccentric: (Int?) -> Unit,
+    pause: Int?,
+    onPause: (Int?) -> Unit
+) {
+    val palette = MaterialTheme.glass
+    @Composable
+    fun Caption(text: String) =
+        Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = palette.contentMuted)
+
+    @Composable
+    fun SecondsRow(label: String, options: List<Int?>, selected: Int?, onSelect: (Int?) -> Unit) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = palette.content, modifier = Modifier.width(48.dp))
+            options.forEach { option ->
+                GlassFilterChip(text = option?.let { "${it}s" } ?: "Off", selected = selected == option, onClick = { onSelect(option) })
+            }
+        }
+    }
+
+    GlassCard(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Caption("Set type")
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SetType.entries.forEach { type -> GlassFilterChip(text = type.label, selected = type == setType, onClick = { onSetType(type) }) }
+        }
+        if (setType == SetType.WARMUP) {
+            Text("Warm-ups don't count towards sets, volume or records", style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
+        }
+        Caption("Tempo")
+        SecondsRow("Down", EccentricOptions, eccentric, onEccentric)
+        SecondsRow("Hold", PauseOptions, pause, onPause)
     }
 }
 

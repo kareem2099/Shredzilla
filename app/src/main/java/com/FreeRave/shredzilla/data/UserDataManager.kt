@@ -10,7 +10,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import com.FreeRave.shredzilla.models.UserExerciseList
 import com.FreeRave.shredzilla.models.RecordedSet
+import com.FreeRave.shredzilla.models.MeasurementCadence
 import com.FreeRave.shredzilla.models.SetEntry
+import com.FreeRave.shredzilla.models.SetType
+import com.FreeRave.shredzilla.models.Side
 import com.FreeRave.shredzilla.screens.settings.ThemeSetting
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
 import com.google.firebase.Timestamp
@@ -63,6 +66,14 @@ class UserDataManager(
     var userUnitSystem by mutableStateOf(UnitSystem.METRIC)
     var userWorkoutReminderSetting by mutableStateOf("Never")
     var userWeeklyGoalDays by mutableStateOf<Int?>(null)
+    /** Week keys (first day of the week) the user marked as deload weeks. */
+    var deloadWeeks by mutableStateOf<Set<String>>(emptySet())
+        private set
+    /** The week the deload reminder was dismissed in, so it stays hidden for the rest of that week. */
+    var deloadReminderDismissedWeek by mutableStateOf<String?>(null)
+        private set
+    var measurementCadence by mutableStateOf(MeasurementCadence.WEEKLY)
+        private set
     var themePreferenceMale by mutableStateOf(ThemeSetting.SYSTEM)
     var themePreferenceFemale by mutableStateOf(ThemeSetting.SYSTEM)
     var userExerciseLists by mutableStateOf<List<UserExerciseList>>(emptyList())
@@ -98,6 +109,9 @@ class UserDataManager(
         userUnitSystem = UnitSystem.METRIC
         userWorkoutReminderSetting = "Never"
         userWeeklyGoalDays = null
+        deloadWeeks = emptySet()
+        deloadReminderDismissedWeek = null
+        measurementCadence = MeasurementCadence.WEEKLY
         themePreferenceMale = ThemeSetting.SYSTEM
         themePreferenceFemale = ThemeSetting.SYSTEM
         userExerciseLists = emptyList()
@@ -126,7 +140,8 @@ class UserDataManager(
             userDoc.collection("exerciseLists"),
             userDoc.collection("exercises"),
             userDoc.collection(TrainingHistoryStore.WORKOUTS),
-            userDoc.collection(TrainingHistoryStore.RECORDS)
+            userDoc.collection(TrainingHistoryStore.RECORDS),
+            userDoc.collection(TrainingHistoryStore.MEASUREMENTS)
         ).forEach { deleteCollection(it) }
         userDoc.delete().await()
     }
@@ -192,6 +207,10 @@ class UserDataManager(
                             .takeIf { it >= 0 }?.plus(1)
                         userDocSnapshot.getString("workoutReminder")
                             ?.let { userWorkoutReminderSetting = it }
+                        @Suppress("UNCHECKED_CAST")
+                        deloadWeeks = (userDocSnapshot.get("deloadWeeks") as? List<String>).orEmpty().toSet()
+                        deloadReminderDismissedWeek = userDocSnapshot.getString("deloadReminderDismissedWeek")
+                        measurementCadence = MeasurementCadence.fromStored(userDocSnapshot.getString("measurementCadence"))
 
                         val oldThemeMale = themePreferenceMale
                         val oldThemeFemale = themePreferenceFemale
@@ -308,12 +327,20 @@ class UserDataManager(
                                 timestamp = ts,
                                 exerciseId = exId,
                                 firestoreDocId = doc.id,
-                                plates = doc.getLong("plates")?.toInt()
+                                plates = doc.getLong("plates")?.toInt(),
+                                side = Side.fromStored(doc.getString("side")),
+                                bodyweight = doc.getBoolean("bodyweight") ?: false,
+                                setType = SetDocFields.setTypeOf(doc),
+                                tempo = SetDocFields.tempoOf(doc),
+                                perSide = SetDocFields.perSideOf(doc)
                             )
                         )
-                        repsCount += reps; setsCount++; if (exName.isNotBlank()) uniqueExNames.add(
-                        exName
-                    )
+                        // Warm-ups are logged but don't count towards the day's totals
+                        if (SetDocFields.setTypeOf(doc) != SetType.WARMUP) {
+                            repsCount += reps
+                            setsCount++
+                        }
+                        if (exName.isNotBlank()) uniqueExNames.add(exName)
                     }
                     todayRecordedSetsList = currentSets
                     todayTotalReps = repsCount; todayTotalSets = setsCount; todayUniqueExercises =
@@ -511,8 +538,13 @@ class UserDataManager(
         onDone: () -> Unit = {}
     ) {
         val userId = currentUser?.uid ?: return
-        // Switching a set back from plates to kg must drop the old plate count
-        val changes = storedFieldsOf(entry) + ("plates" to (entry.plates ?: FieldValue.delete()))
+        // Switching a set back from plates to kg (or to both sides) must drop the old field
+        val changes = storedFieldsOf(entry) +
+            ("plates" to (entry.plates ?: FieldValue.delete())) +
+            ("side" to (entry.side?.storedValue ?: FieldValue.delete())) +
+            ("bodyweight" to (if (entry.bodyweight) true else FieldValue.delete())) +
+            SetDocFields.CLEARABLE.associateWith { FieldValue.delete() } +
+            SetDocFields.extrasOf(entry)
         setsCollection(userId, dateKey).document(docId).update(changes)
             .addOnFailureListener { e -> Log.e("Firestore", "Error updating set $docId", e) }
         onDone() // already applied locally, see recordSet
@@ -524,6 +556,9 @@ class UserDataManager(
         put("weight", if (entry.plates != null) 0.0 else convertToStorageWeight(entry.weight))
         put("notes", entry.notes)
         entry.plates?.let { put("plates", it.toLong()) }
+        entry.side?.let { put("side", it.storedValue) }
+        if (entry.bodyweight) put("bodyweight", true)
+        putAll(SetDocFields.extrasOf(entry))
     }
 
     // DRY Helper for settings updates
@@ -532,6 +567,20 @@ class UserDataManager(
         db.collection("users").document(userId).set(hashMapOf(key to value), SetOptions.merge())
             .addOnFailureListener { e -> Log.e("Firestore", "Failed to update setting $key", e) }
     }
+
+    fun setDeloadWeek(weekKey: String, isDeload: Boolean, currentUser: FirebaseUser?) {
+        updateUserSetting(
+            currentUser?.uid,
+            "deloadWeeks",
+            if (isDeload) FieldValue.arrayUnion(weekKey) else FieldValue.arrayRemove(weekKey)
+        )
+    }
+
+    fun dismissDeloadReminder(weekKey: String, currentUser: FirebaseUser?) =
+        updateUserSetting(currentUser?.uid, "deloadReminderDismissedWeek", weekKey)
+
+    fun updateMeasurementCadence(cadence: MeasurementCadence, currentUser: FirebaseUser?) =
+        updateUserSetting(currentUser?.uid, "measurementCadence", cadence.storedValue)
 
     // DRY Helper for unit conversion
     private fun convertToStorageWeight(displayWeight: Double): Double = displayToKg(displayWeight, userUnitSystem)

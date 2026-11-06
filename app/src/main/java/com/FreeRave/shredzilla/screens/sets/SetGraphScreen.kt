@@ -1,5 +1,6 @@
 package com.FreeRave.shredzilla.screens.sets
 
+import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
 import androidx.compose.foundation.clickable
@@ -67,6 +68,8 @@ fun SetGraphScreen(
     recordCount: Int,
     onOpenHistory: () -> Unit,
     onOpenRecords: () -> Unit,
+    measurementCount: Int,
+    onOpenBody: () -> Unit,
     onNavigateToCreateNewList: () -> Unit,
     onNavigateToExerciseListDetail: (listId: String, listName: String) -> Unit,
     isTimerRunning: Boolean,
@@ -129,6 +132,13 @@ fun SetGraphScreen(
                         title = "Records",
                         subtitle = "$recordCount ${if (recordCount == 1) "exercise" else "exercises"}",
                         onClick = onOpenRecords,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ShortcutTile(
+                        icon = Icons.Filled.Straighten,
+                        title = "Body",
+                        subtitle = "$measurementCount ${if (measurementCount == 1) "entry" else "entries"}",
+                        onClick = onOpenBody,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -292,6 +302,8 @@ private fun SetGraphScreenPreview() {
             recordCount = 8,
             onOpenHistory = {},
             onOpenRecords = {},
+            measurementCount = 3,
+            onOpenBody = {},
             onNavigateToCreateNewList = {},
             onNavigateToExerciseListDetail = { _, _ -> },
             isTimerRunning = true,

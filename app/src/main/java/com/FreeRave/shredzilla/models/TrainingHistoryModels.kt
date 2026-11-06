@@ -1,9 +1,18 @@
 package com.FreeRave.shredzilla.models
 
-/** A load as stored for sets: kilograms, or a plate count on a weight stack ([weightKg] is 0 then). */
-data class SetLoad(val weightKg: Double, val plates: Int?, val reps: Int)
+/**
+ * A load as stored for sets: kilograms, a plate count on a weight stack ([weightKg] is 0 then),
+ * or bodyweight with [weightKg] added on top.
+ */
+data class SetLoad(
+    val weightKg: Double,
+    val plates: Int?,
+    val reps: Int,
+    val bodyweight: Boolean = false,
+    val perSide: Boolean = false
+)
 
-val LoggedSet.setLoad: SetLoad get() = SetLoad(weightKg, plates, reps)
+val LoggedSet.setLoad: SetLoad get() = SetLoad(weightKg, plates, reps, bodyweight, perSide)
 
 /** One exercise's part of a finished workout. */
 data class WorkoutExerciseSummary(val exerciseId: String, val name: String, val sets: Int, val best: SetLoad?)
