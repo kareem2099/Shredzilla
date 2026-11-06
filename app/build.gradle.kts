@@ -12,8 +12,8 @@ android {
         applicationId = "com.FreeRave.shredzilla"
         minSdk = 29
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.4.0"
+        versionCode = 8
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -93,12 +93,13 @@ dependencies {
     implementation(libs.firebase.firestore.ktx) // Firebase Firestore
     implementation(libs.firebase.analytics.ktx) // Firebase Analytics
     implementation(libs.firebase.fcm)           // Firebase Cloud Messaging
+    implementation(libs.firebase.config)        // Remote Config: minimum supported version, update message
+    implementation(libs.play.app.update)        // Google Play in-app updates
     implementation(libs.play.services.auth)              // Google Play Services transport for Credential Manager
     implementation(libs.androidx.credentials)             // Credential Manager core
     implementation(libs.androidx.credentials.play.services) // Credential Manager + Play Services bridge
     implementation(libs.googleid)                         // GetGoogleIdOption
     implementation(libs.play.services.ads)      // Google AdMob
-    implementation(libs.app.updater)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

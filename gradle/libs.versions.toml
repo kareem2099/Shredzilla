@@ -19,13 +19,16 @@ firebaseMessaging = "24.1.2"
 googleServicesPlugin = "4.5.0"
 playServicesAuth = "21.6.0"
 playServicesAds = "25.4.0"
-appUpdater = "2.7"
 lifecycleProcess = "2.11.0"
 credentials = "1.6.0"
 googleid = "1.2.0"
 reorderable = "2.5.1"
+firebaseConfig = "22.1.2"
+playAppUpdate = "2.1.0"
 
 [libraries]
+firebase-config = { group = "com.google.firebase", name = "firebase-config", version.ref = "firebaseConfig" }
+play-app-update = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebaseAuth" }
@@ -51,7 +54,6 @@ androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "j
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-app-updater = { group = "com.github.javiersantos", name = "AppUpdater", version.ref = "appUpdater" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleProcess" }
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }

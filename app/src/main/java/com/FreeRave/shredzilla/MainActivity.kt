@@ -26,9 +26,9 @@ import com.FreeRave.shredzilla.ui.theme.ThemeManager
 import com.FreeRave.shredzilla.ui.theme.glass
 import com.FreeRave.shredzilla.utils.NotificationUtils
 import com.FreeRave.shredzilla.viewmodels.MainViewModel
-import com.github.javiersantos.appupdater.AppUpdater
-import com.github.javiersantos.appupdater.enums.Display
-import com.github.javiersantos.appupdater.enums.UpdateFrom
+import androidx.compose.foundation.layout.Box
+import com.FreeRave.shredzilla.update.AppUpdateController
+import com.FreeRave.shredzilla.update.AppUpdateOverlay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
 
     private val TAG = "MainActivity"
+    private lateinit var appUpdateController: AppUpdateController
     private val EXTRA_DEBUG_ROUTE = "debugRoute"
     private val EXTRA_DEBUG_GENDER = "debugGender"
 
@@ -52,13 +53,9 @@ class MainActivity : ComponentActivity() {
         // MobileAds.initialize removed from here — it's already in MyApplication
 
         NotificationUtils.createNotificationChannels(applicationContext)
-        // AppUpdater checks internally so no need for AppUpdaterUtils
-        AppUpdater(this)
-            .setUpdateFrom(UpdateFrom.JSON)
-            .setUpdateJSON("https://fitnessapp-9b198.web.app/update-info.json")
-            .setDisplay(Display.DIALOG)
-            .setCancelable(false)
-            .start()
+        // Google Play updates plus the Remote Config minimum version; once per launch, not per rotation
+        appUpdateController = AppUpdateController(this)
+        if (savedInstanceState == null) appUpdateController.check()
 
         firebaseGoogleAuthManager = FirebaseGoogleAuth(this)
 
@@ -67,20 +64,24 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val startDestination by mainViewModel.startDestinationFlow.collectAsState()
 
-            if (startDestination != null) {
-                AppNavigationHost(
-                    navController = navController,
-                    startDestination = startDestination!!,
-                    firebaseEmailAuthManager = firebaseEmailAuthManager,
-                    firebaseGoogleAuthManager = firebaseGoogleAuthManager
-                )
-            } else {
-                // Brief wait while we work out where to send the user; same backdrop as what follows
-                ShredzillaTheme {
-                    GlassBackground(contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MaterialTheme.glass.accent)
+            Box {
+                if (startDestination != null) {
+                    AppNavigationHost(
+                        navController = navController,
+                        startDestination = startDestination!!,
+                        firebaseEmailAuthManager = firebaseEmailAuthManager,
+                        firebaseGoogleAuthManager = firebaseGoogleAuthManager
+                    )
+                } else {
+                    // Brief wait while we work out where to send the user; same backdrop as what follows
+                    ShredzillaTheme {
+                        GlassBackground(contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = MaterialTheme.glass.accent)
+                        }
                     }
                 }
+                // Above everything: a required update blocks the app, otherwise a prompt or download progress
+                AppUpdateOverlay(appUpdateController)
             }
         }
 
@@ -99,6 +100,16 @@ class MainActivity : ComponentActivity() {
                 mainViewModel.updateStartDestination(AppRoutes.AUTH)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        appUpdateController.onResume()
+    }
+
+    override fun onDestroy() {
+        appUpdateController.release()
+        super.onDestroy()
     }
 
     /**

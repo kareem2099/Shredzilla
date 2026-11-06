@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] — Unreleased
+
+### Added
+- **Offline logging**: sets, edits and exercises save without internet and sync when the connection is back; an offline banner shows when there's no working connection.
+- **Plates, bodyweight and per-side loads**: log stack machines by plate count, bodyweight work with optional added weight, and plate-loaded machines per side.
+- **One side at a time**: left/right sets that alternate automatically, rest after both sides, and a pair counts as one set.
+- **Workout mode**: guided sessions with targets, supersets, last session's sets and the change on every set, then a shareable summary.
+- **History, records and sharing**: saved workouts, all-time personal records with a celebration banner, and a summary card to share as an image.
+- **Set details**: warm-up, rest-pause, drop set and to-failure types (warm-ups stay out of counts, volume and records), plus tempo (lowering and hold seconds).
+- **Progression help**: next-set suggestions, a barbell plate calculator and estimated 1RM for plate exercises.
+- **Weekly goal and deload**: progress ring, streak, deload weeks, and a reminder after 6 hard weeks.
+- **Body measurements**: right/left measurements with weekly or monthly reminders, trends, body weight and plain-language insights.
+- **Exercise catalog** grouped by muscle, and drag-to-reorder exercises in a list.
+- **App updates through Google Play**: in-app update prompts with background download, and a minimum supported version set from Firebase Remote Config.
+
+### Changed
+- Rest timer: lock-screen countdown, on-time alert with the screen off, vibration when rest ends, and tapping it returns to the app.
+- New launcher icon.
+
+### Removed
+- The AppUpdater library and its JitPack repository; updates now come from Google Play directly.
+
+---
+
 ## [1.4.0] — 2026-11-04
 
 ### Added
