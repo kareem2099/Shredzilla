@@ -1,16 +1,16 @@
 {
-  "latestVersion": "1.5.1",
-  "latestVersionCode": 9,
+  "latestVersion": "1.6.0",
+  "latestVersionCode": 10,
   "url": "https://play.google.com/store/apps/details?id=com.FreeRave.shredzilla",
   "releaseNotes": [
+    "No more forced ads: ads only play if you choose to watch one.",
+    "New DotShredzilla Pro: next-set coach, last-time comparison, body insights, training stats, accent themes and share-card styles.",
+    "Get Pro for life with one payment, or 1 hour of Pro per optional ad.",
+    "Today shows your training time and numbers sets 1, 2, 3.",
     "Works offline: your sets save without internet and sync when you're back online.",
-    "Workout mode with supersets, last session's sets and the change on every set.",
-    "Plates, bodyweight, per-side and left/right sets.",
-    "Personal records, workout history and a shareable summary card.",
-    "Warm-up and rest-pause sets, tempo, plate calculator and next-set suggestions.",
-    "Weekly goal, streak and deload reminders.",
-    "Body measurements with trends and insights.",
-    "Rest timer on the lock screen and a new icon.",
-    "Profile photos use Android's photo picker, so the app no longer needs access to your whole gallery."
+    "Workout mode with supersets, personal records, workout history and a shareable summary card.",
+    "Plates, bodyweight, per-side and left/right sets, warm-ups, tempo and a plate calculator.",
+    "Weekly goal, streak, deload reminders and body measurements.",
+    "Support development with a tip and get a Supporter badge."
   ]
 }
