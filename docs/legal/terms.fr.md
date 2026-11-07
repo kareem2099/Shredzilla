@@ -1,6 +1,6 @@
 # Conditions d’utilisation de DotShredzilla
 
-**Dernière mise à jour : 6 novembre 2026.**
+**Dernière mise à jour : 7 novembre 2026.**
 
 ## 1. Fournisseur et champ d’application
 
@@ -30,6 +30,13 @@ Vérifiez l’exercice, le poids, les répétitions et les autres informations q
 vous saisissez. Les graphiques, records, suggestions et analyses sont calculés à
 partir de ces informations et ne sont précis que dans la mesure où vos saisies
 le sont.
+
+L’enregistrement des séries, listes et programmes, les séances guidées, les
+supersets, le minuteur de repos, le calculateur de disques, les records
+personnels, les objectifs hebdomadaires, les séries de semaines, les rappels de
+décharge, la saisie des mensurations, l’historique et le partage sont gratuits.
+Certaines fonctions supplémentaires font partie de DotShredzilla Pro, décrit à
+la section 6.
 
 ## 3. Entraînement, santé et sécurité
 
@@ -67,12 +74,50 @@ influer sur le moment, la visibilité, le son ou la vibration du minuteur de
 repos et des autres notifications. Nous ne pouvons pas garantir que chaque
 alerte arrivera à l’heure exacte.
 
-## 6. Confidentialité, publicité et services externes
+## 6. DotShredzilla Pro, achats et pourboires
 
-L’application contient de la publicité et utilise des services externes pour
-des fonctions comme la connexion, la synchronisation, les statistiques et les
-mises à jour. Leur disponibilité et leurs conditions peuvent influer sur ces
-fonctions.
+DotShredzilla Pro ajoute des fonctions comme les suggestions pour la série
+suivante, la comparaison avec la séance précédente, les analyses et courbes des
+mensurations, des statistiques d’entraînement avancées, des couleurs d’accent et
+des styles de carte de partage. Nous pouvons ajouter, améliorer ou modifier les
+fonctions Pro au fil du temps ; ces changements ne réduisent pas les droits que
+vous accorde le droit de la consommation applicable.
+
+**Pro à vie** est un achat unique via Google Play, pas un abonnement. Il est lié
+au compte Google Play utilisé pour l’achat et peut être restauré sur vos
+appareils avec « Restore purchases ». Il reste disponible tant que DotShredzilla
+est proposé et pris en charge.
+
+**Les heures Pro par publicité** sont facultatives. Chaque publicité avec
+récompense que vous choisissez de regarder jusqu’au bout ajoute une heure de
+Pro, jusqu’à 8 heures en réserve et 5 publicités sur toute période de 24 heures.
+Notre serveur n’ajoute le temps qu’après que Google a confirmé le visionnage, en
+utilisant l’horloge du serveur. Les heures Pro s’écoulent en temps réel, même
+application fermée, sont liées à votre compte DotShredzilla, ne sont pas
+transférables et n’ont aucune valeur monétaire. Les limites applicables aux
+publicités futures peuvent changer.
+
+**Les pourboires** (un shot pré-entraînement, une dose de protéine ou un pot de
+créatine) sont des paiements facultatifs et renouvelables qui soutiennent le
+développement et ajoutent un badge Supporter. Ils ne débloquent ni Pro ni aucune
+autre fonction et ne sont pas des dons à une œuvre caritative.
+
+Les paiements sont traités par Google Play selon les conditions de Google Play ;
+les prix affichés dans l’application proviennent de Google Play dans votre
+devise. Les remboursements suivent les règles de remboursement de Google Play et
+la loi applicable, et vous pouvez aussi contacter l’assistance. Vos droits
+légaux, y compris tout droit de rétractation prévu par la loi qui vous
+s’applique, ne sont pas affectés. N’essayez pas d’obtenir Pro en contournant les
+paiements, la vérification des publicités ou les limites.
+
+## 7. Confidentialité, publicité et services externes
+
+L’application n’affiche aucune publicité, sauf si vous choisissez de regarder
+une publicité avec récompense sur la page Pro. Elle utilise des services
+externes pour des fonctions comme la connexion, la synchronisation, les
+statistiques, les mises à jour, les paiements (Google Play Billing) et les
+publicités avec récompense (Google AdMob). Leur disponibilité et leurs
+conditions peuvent influer sur ces fonctions.
 
 Consultez la [politique de confidentialité de DotShredzilla](https://dotsuite.dev/fr/privacy#dotshredzilla)
 pour les pratiques relatives aux données, y compris les informations de santé
@@ -81,7 +126,7 @@ prestataires. Ces conditions n’accordent pas d’autorisation générale pour 
 traitement de données qui exige un choix ou un consentement distinct selon la
 loi applicable.
 
-## 7. Arrêter l’utilisation et supprimer votre compte
+## 8. Arrêter l’utilisation et supprimer votre compte
 
 Vous pouvez cesser d’utiliser l’application à tout moment. Vous pouvez
 supprimer votre compte DotShredzilla et les données associées dans
@@ -98,7 +143,11 @@ données des prestataires et toute conservation imposée par la loi.
 Désinstaller l’application ou vous déconnecter ne supprime pas en soi votre
 compte ni vos données en ligne.
 
-## 8. Évolution du service et restrictions d’accès
+La suppression de votre compte efface les heures Pro en réserve et le badge
+Supporter. Pro à vie appartient à votre compte Google Play et peut être restauré
+si vous créez un nouveau compte.
+
+## 9. Évolution du service et restrictions d’accès
 
 Les mises à jour, la maintenance, les pannes techniques ou les changements de
 prestataires peuvent affecter le service. Certaines versions de l’application
@@ -110,7 +159,7 @@ possible et licite, nous expliquerons la restriction et comment contacter
 l’assistance pour contester une erreur. Vous pouvez toujours contacter
 l’assistance au sujet de vos données et de vos droits.
 
-## 9. Licence open source et droits légaux
+## 10. Licence open source et droits légaux
 
 Le code source publié de DotShredzilla est distribué sous
 [Apache License 2.0](https://github.com/kareem2099/Shredzilla/blob/main/LICENSE).
@@ -121,7 +170,7 @@ Rien dans ces conditions n’exclut ni ne limite un droit, une garantie, un
 recours ou une responsabilité du consommateur qui ne peut légalement être
 exclu ou limité en vertu de la loi qui vous est applicable.
 
-## 10. Modifications et contact
+## 11. Modifications et contact
 
 Nous indiquerons la date d’entrée en vigueur des conditions publiées. En cas de
 modification importante, nous vous en informerons à l’avance de manière

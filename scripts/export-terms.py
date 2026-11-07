@@ -11,8 +11,8 @@ root = Path(__file__).resolve().parents[1]
 documents = {}
 for language in ("en", "ar", "de", "fr", "ru"):
     text = (root / "docs" / "legal" / f"terms.{language}.md").read_text()
-    if sum(line.startswith("## ") for line in text.splitlines()) != 10:
-        raise ValueError(f"Expected ten sections for {language}")
+    if sum(line.startswith("## ") for line in text.splitlines()) != 11:
+        raise ValueError(f"Expected eleven sections for {language}")
     if "support@dotsuite.dev" not in text or "#delete-dotshredzilla" not in text:
         raise ValueError(f"Missing support/deletion link for {language}")
     documents[language] = text

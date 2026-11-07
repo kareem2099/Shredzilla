@@ -1,6 +1,6 @@
 # DotShredzilla Terms of Use
 
-**Last updated: November 6, 2026.**
+**Last updated: November 7, 2026.**
 
 ## 1. Provider and scope
 
@@ -26,6 +26,11 @@ can vary with the app version and device.
 Check the exercise, weight, reps and other details you enter. Charts, records,
 suggestions and insights are calculated from that information and are only as
 accurate as what you log.
+
+Logging sets, lists and programs, guided workouts, supersets, the rest timer,
+plate calculator, personal records, weekly goals, streaks, deload reminders,
+measurement entry, workout history and sharing are free. Some additional
+features are part of DotShredzilla Pro, described in section 6.
 
 ## 3. Training, health and safety
 
@@ -60,11 +65,44 @@ settings and other technical conditions can affect the timing, visibility,
 sound or vibration of the rest timer and other notifications. We cannot promise
 that every alert will arrive at an exact time.
 
-## 6. Privacy, advertising and external services
+## 6. DotShredzilla Pro, purchases and tips
 
-The app includes advertising and uses external services for functions such as
-authentication, synchronization, analytics and app updates. Their availability
-and applicable terms can affect those functions.
+DotShredzilla Pro adds features such as next-set suggestions, comparison with
+your last session, body-measurement insights and trend charts, advanced
+training statistics, accent themes and share-card styles. We may add, improve
+or change Pro features over time; such changes do not reduce rights you have
+under applicable consumer law.
+
+**Pro for life** is a one-time purchase through Google Play, not a
+subscription. It is linked to the Google Play account used to buy it and can
+be restored on your devices with "Restore purchases". It stays available for
+as long as DotShredzilla is offered and supported.
+
+**Pro hours from ads** are optional. Each rewarded ad you choose to watch to the
+end adds one hour of Pro, up to 8 banked hours and 5 ads in any 24 hours. Our
+server adds the time only after Google confirms the ad was watched, using the
+server's clock. Pro hours run in real time, also while the app is closed, are
+linked to your DotShredzilla account, cannot be transferred and have no cash
+value. Limits for future ads may change.
+
+**Tips** (a pre-workout shot, a protein scoop or a creatine tub) are optional,
+repeatable payments that support development and add a Supporter badge. They do
+not unlock Pro or any other feature and are not charitable donations.
+
+Payments are processed by Google Play under Google Play's terms; prices shown
+in the app come from Google Play in your currency. Refunds follow Google Play's
+refund policies and applicable law, and you can also contact support. Your
+statutory rights, including any right of withdrawal under the law that applies
+to you, are not affected. Do not try to obtain Pro by circumventing payments,
+ad verification or limits.
+
+## 7. Privacy, advertising and external services
+
+The app shows no advertising unless you choose to watch a rewarded ad on the
+Pro page. It uses external services for functions such as authentication,
+synchronization, analytics, app updates, payments (Google Play Billing) and
+rewarded ads (Google AdMob). Their availability and applicable terms can affect
+those functions.
 
 Read the [DotShredzilla privacy policy](https://dotsuite.dev/en/privacy#dotshredzilla)
 for data practices, including health and fitness information, permissions,
@@ -72,7 +110,7 @@ advertising, analytics and service-provider information. These terms do not
 grant blanket permission for data processing that requires a separate choice
 or consent under applicable law.
 
-## 7. Stopping use and deleting your account
+## 8. Stopping use and deleting your account
 
 You can stop using the app at any time. You can delete your DotShredzilla
 account and associated data in the app (Settings, then Account, then Delete
@@ -87,7 +125,11 @@ delete data. The privacy policy explains the deletion scope, local copies,
 provider data and any legally required retention. Uninstalling the app or
 signing out does not itself delete your cloud account or data.
 
-## 8. Service changes and access restrictions
+Deleting your account removes banked Pro hours and the Supporter badge. Pro for
+life belongs to your Google Play account and can be restored if you create a
+new account.
+
+## 9. Service changes and access restrictions
 
 Updates, maintenance, technical failures or provider changes may affect the
 service. Some versions of the app may stop being supported and require an
@@ -97,7 +139,7 @@ reasonably possible and lawful, we will explain the restriction and how to
 contact support to challenge an error. You may still contact support about
 your data and applicable rights.
 
-## 9. Open-source licensing and legal rights
+## 10. Open-source licensing and legal rights
 
 DotShredzilla's published source code is licensed under
 [Apache License 2.0](https://github.com/kareem2099/Shredzilla/blob/main/LICENSE).
@@ -108,7 +150,7 @@ Nothing in these terms excludes or limits a consumer right, warranty, remedy
 or liability that cannot lawfully be excluded or limited under the law that
 applies to you.
 
-## 10. Changes and contact
+## 11. Changes and contact
 
 We will identify the effective date of published terms. If we make material
 changes, we will provide appropriate advance notice and obtain any acceptance

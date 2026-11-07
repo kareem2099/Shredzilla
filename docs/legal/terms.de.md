@@ -1,6 +1,6 @@
 # DotShredzilla-Nutzungsbedingungen
 
-**Zuletzt aktualisiert: 6. November 2026.**
+**Zuletzt aktualisiert: 7. November 2026.**
 
 ## 1. Anbieter und Geltungsbereich
 
@@ -27,6 +27,12 @@ variieren.
 Prüfen Sie Übung, Gewicht, Wiederholungen und andere Angaben, die Sie
 eintragen. Diagramme, Rekorde, Vorschläge und Auswertungen werden aus diesen
 Angaben berechnet und sind nur so genau wie das, was Sie erfassen.
+
+Das Erfassen von Sätzen, Listen und Programmen, geführte Workouts, Supersätze,
+der Pausentimer, der Scheibenrechner, persönliche Rekorde, Wochenziele, Serien,
+Deload-Erinnerungen, die Eingabe von Körpermaßen, der Trainingsverlauf und das
+Teilen sind kostenlos. Einige zusätzliche Funktionen gehören zu DotShredzilla
+Pro, beschrieben in Abschnitt 6.
 
 ## 3. Training, Gesundheit und Sicherheit
 
@@ -65,10 +71,47 @@ Sichtbarkeit, Ton oder Vibration des Pausentimers und anderer Benachrichtigungen
 beeinflussen. Wir können nicht versprechen, dass jeder Hinweis exakt pünktlich
 ankommt.
 
-## 6. Datenschutz, Werbung und externe Dienste
+## 6. DotShredzilla Pro, Käufe und Trinkgelder
 
-Die App enthält Werbung und nutzt externe Dienste für Funktionen wie
-Anmeldung, Synchronisierung, Analyse und App-Updates. Deren Verfügbarkeit und
+DotShredzilla Pro ergänzt Funktionen wie Vorschläge für den nächsten Satz, den
+Vergleich mit dem letzten Training, Auswertungen und Verlaufsdiagramme der
+Körpermaße, erweiterte Trainingsstatistiken, Akzentfarben und Stile für
+Teilen-Karten. Wir können Pro-Funktionen im Lauf der Zeit ergänzen, verbessern
+oder ändern; solche Änderungen schmälern keine Rechte, die Ihnen nach
+geltendem Verbraucherrecht zustehen.
+
+**Pro auf Lebenszeit** ist ein einmaliger Kauf über Google Play, kein Abo. Er
+ist mit dem Google-Play-Konto verknüpft, mit dem er gekauft wurde, und lässt
+sich auf Ihren Geräten über „Restore purchases" wiederherstellen. Er bleibt
+verfügbar, solange DotShredzilla angeboten und unterstützt wird.
+
+**Pro-Stunden durch Werbung** sind freiwillig. Jede Werbung mit Belohnung, die
+Sie bis zum Ende ansehen, fügt eine Stunde Pro hinzu, bis zu 8 angesparte
+Stunden und 5 Werbungen in beliebigen 24 Stunden. Unser Server schreibt die Zeit
+erst gut, nachdem Google das Ansehen bestätigt hat, und verwendet dabei die
+Serverzeit. Pro-Stunden laufen in Echtzeit ab, auch bei geschlossener App, sind
+mit Ihrem DotShredzilla-Konto verknüpft, nicht übertragbar und ohne Geldwert.
+Die Grenzen für künftige Werbung können sich ändern.
+
+**Trinkgelder** (ein Pre-Workout-Shot, ein Proteinmessbecher oder eine Dose
+Kreatin) sind freiwillige, wiederholbare Zahlungen zur Unterstützung der
+Entwicklung und fügen ein Supporter-Abzeichen hinzu. Sie schalten weder Pro noch
+andere Funktionen frei und sind keine Spenden für gemeinnützige Zwecke.
+
+Zahlungen werden von Google Play nach den Bedingungen von Google Play
+abgewickelt; die Preise in der App stammen von Google Play in Ihrer Währung.
+Erstattungen richten sich nach den Erstattungsrichtlinien von Google Play und
+dem geltenden Recht; Sie können sich auch an den Support wenden. Ihre
+gesetzlichen Rechte, einschließlich eines Widerrufsrechts nach dem für Sie
+geltenden Recht, bleiben unberührt. Versuchen Sie nicht, Pro durch Umgehung von
+Zahlungen, der Werbeprüfung oder der Grenzen zu erhalten.
+
+## 7. Datenschutz, Werbung und externe Dienste
+
+Die App zeigt keine Werbung, außer Sie entscheiden sich auf der Pro-Seite für
+eine Werbung mit Belohnung. Sie nutzt externe Dienste für Funktionen wie
+Anmeldung, Synchronisierung, Analyse, App-Updates, Zahlungen (Google Play
+Billing) und Werbung mit Belohnung (Google AdMob). Deren Verfügbarkeit und
 Bedingungen können diese Funktionen beeinflussen.
 
 Lesen Sie die [Datenschutzhinweise zu DotShredzilla](https://dotsuite.dev/de/privacy#dotshredzilla)
@@ -77,7 +120,7 @@ Berechtigungen, Werbung, Analyse und Informationen der Dienstleister. Diese
 Bedingungen erteilen keine pauschale Erlaubnis für Datenverarbeitungen, die nach
 anwendbarem Recht eine gesonderte Wahl oder Einwilligung erfordern.
 
-## 7. Nutzung beenden und Konto löschen
+## 8. Nutzung beenden und Konto löschen
 
 Sie können die Nutzung jederzeit beenden. Sie können Ihr DotShredzilla-Konto
 und die zugehörigen Daten in der App löschen (Settings, dann Account, dann
@@ -93,7 +136,12 @@ Umfang der Löschung, lokale Kopien, Daten bei Anbietern und gesetzlich
 vorgeschriebene Aufbewahrung. Deinstallation oder Abmeldung löscht Ihr
 Cloud-Konto und Ihre Daten nicht.
 
-## 8. Änderungen des Dienstes und Zugangsbeschränkungen
+Mit dem Löschen Ihres Kontos werden angesparte Pro-Stunden und das
+Supporter-Abzeichen entfernt. Pro auf Lebenszeit gehört zu Ihrem
+Google-Play-Konto und kann wiederhergestellt werden, wenn Sie ein neues Konto
+anlegen.
+
+## 9. Änderungen des Dienstes und Zugangsbeschränkungen
 
 Updates, Wartung, technische Störungen oder Änderungen bei Anbietern können den
 Dienst beeinträchtigen. Manche App-Versionen werden möglicherweise nicht mehr
@@ -105,7 +153,7 @@ die Beschränkung und wie Sie den Support kontaktieren, um einen Fehler
 anzufechten. Sie können sich weiterhin wegen Ihrer Daten und Rechte an den
 Support wenden.
 
-## 9. Open-Source-Lizenz und gesetzliche Rechte
+## 10. Open-Source-Lizenz und gesetzliche Rechte
 
 Der veröffentlichte Quellcode von DotShredzilla steht unter der
 [Apache License 2.0](https://github.com/kareem2099/Shredzilla/blob/main/LICENSE).
@@ -116,7 +164,7 @@ Nichts in diesen Bedingungen schließt Verbraucherrechte, Gewährleistungen,
 Abhilfen oder Haftung aus oder beschränkt sie, soweit dies nach dem für Sie
 geltenden Recht nicht zulässig ist.
 
-## 10. Änderungen und Kontakt
+## 11. Änderungen und Kontakt
 
 Wir geben das Datum an, ab dem veröffentlichte Bedingungen gelten. Bei
 wesentlichen Änderungen informieren wir angemessen im Voraus und holen jede nach
