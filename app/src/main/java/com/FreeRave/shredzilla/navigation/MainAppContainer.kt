@@ -64,7 +64,14 @@ import com.FreeRave.shredzilla.screens.account.UpdateUsernameScreen
 import com.FreeRave.shredzilla.screens.exercises.AddExerciseScreen
 import com.FreeRave.shredzilla.screens.exercises.ExerciseDetailScreen
 import com.FreeRave.shredzilla.screens.exercises.ExercisesScreen
-import com.FreeRave.shredzilla.screens.rewards.AdRewardsScreen
+import com.FreeRave.shredzilla.screens.pro.ProScreen
+import com.FreeRave.shredzilla.screens.stats.StatsScreen
+import com.FreeRave.shredzilla.pro.BillingEvent
+import com.FreeRave.shredzilla.pro.LocalProAccess
+import com.FreeRave.shredzilla.pro.findActivity
+import com.FreeRave.shredzilla.pro.rememberProAccess
+import com.FreeRave.shredzilla.ui.theme.AccentTheme
+import com.FreeRave.shredzilla.ui.glass.GlassDialog
 import com.FreeRave.shredzilla.screens.settings.*
 import com.FreeRave.shredzilla.screens.sets.CreateNewListScreen
 import com.FreeRave.shredzilla.screens.sets.ExerciseListDetailScreen
@@ -110,6 +117,37 @@ fun MainAppContainer(
     }
 
     val currentUser = firebaseEmailAuthManager.getCurrentUser()
+    val billing = mainViewModel.billing
+
+    val proAccess = rememberProAccess(
+        ownsLifetime = billing.ownsProLifetime,
+        bank = userDataManager.adTimeBank,
+        supporterTips = userDataManager.supporterTips,
+        openPro = remember(bottomBarNavController) { { bottomBarNavController.navigate(AppRoutes.PRO) { launchSingleTop = true } } }
+    )
+    // Accent themes are Pro; when Pro ends the profile's own colors come back, and the choice is kept
+    LaunchedEffect(proAccess.isPro, userDataManager.accentThemeKey) {
+        ThemeManager.accentTheme = if (proAccess.isPro) AccentTheme.fromStored(userDataManager.accentThemeKey) else null
+    }
+
+    // Purchases can finish while the user is elsewhere (pending payments, restores), so listen app-wide
+    var billingMessage by remember { mutableStateOf<Pair<String, String>?>(null) }
+    LaunchedEffect(billing) {
+        billing.events.collect { event ->
+            billingMessage = when (event) {
+                BillingEvent.ProUnlocked -> "Welcome to Pro" to "Every Pro feature is unlocked for life. Thank you for backing DotShredzilla!"
+                is BillingEvent.TipReceived -> {
+                    userDataManager.recordSupporterTip(firebaseEmailAuthManager.getCurrentUser())
+                    "Thank you!" to "Your ${event.tip.title.lowercase()} keeps DotShredzilla growing. You're now a Supporter."
+                }
+                BillingEvent.Pending -> "Payment pending" to "Google Play will finish this purchase when the payment clears. It unlocks automatically."
+                is BillingEvent.Failed -> "Purchase didn't complete" to event.message
+            }
+        }
+    }
+    fun buy(productId: String) {
+        context.findActivity()?.let { billing.buy(it, productId) }
+    }
 
     LaunchedEffect(currentUser?.uid) {
         userDataManager.setupFirestoreListeners(currentUser)
@@ -238,6 +276,7 @@ fun MainAppContainer(
     // One shared backdrop for every tab, so switching tabs never flashes a new background.
     // Screens draw their own status-bar inset (top bars); the bottom bar handles the nav-bar inset.
     val isOnline = rememberIsOnline()
+    CompositionLocalProvider(LocalProAccess provides proAccess) {
     GlassBackground {
         Scaffold(
             containerColor = Color.Transparent,
@@ -280,7 +319,8 @@ fun MainAppContainer(
                         },
                         onDismissDeloadReminder = {
                             userDataManager.dismissDeloadReminder(weeklyProgress.thisWeekKey, currentUser)
-                        }
+                        },
+                        workouts = trainingHistory.workoutLogs
                     )
                 }
                 composable(BottomNavItem.Sets.route) {
@@ -298,6 +338,7 @@ fun MainAppContainer(
                         recordCount = trainingHistory.personalRecords.size,
                         onOpenHistory = { bottomBarNavController.navigate(AppRoutes.WORKOUT_HISTORY) },
                         onOpenRecords = { bottomBarNavController.navigate(AppRoutes.PERSONAL_RECORDS) },
+                        onOpenStats = { bottomBarNavController.navigate(AppRoutes.STATS) },
                         measurementCount = trainingHistory.measurements.size,
                         onOpenBody = { bottomBarNavController.navigate(AppRoutes.BODY_MEASUREMENTS) },
                         recommendedProgramName = recommendedProgramId(userDataManager.userWeeklyGoalDays)
@@ -364,7 +405,10 @@ fun MainAppContainer(
                         onNavigateToWorkoutReminders = { bottomBarNavController.navigate(AppRoutes.WORKOUT_REMINDERS) },
                         onNavigateToDefaultRestTimeSettings = { bottomBarNavController.navigate(AppRoutes.DEFAULT_REST_TIME_SETTINGS) },
                         onNavigateToThemeSettings = { bottomBarNavController.navigate(AppRoutes.THEME_SETTINGS) },
-                        onNavigateToAdRewards = { bottomBarNavController.navigate(AppRoutes.AD_REWARDS_SCREEN) }
+                        proSource = proAccess.source,
+                        proRemainingMillis = userDataManager.adTimeBank.remainingMillis(System.currentTimeMillis()),
+                        isSupporter = proAccess.isSupporter,
+                        onNavigateToPro = proAccess.openPro
                     )
                 }
                 composable(AppRoutes.ACCOUNT_SETTINGS) {
@@ -442,7 +486,9 @@ fun MainAppContainer(
                             if (currentGender == "Male") userDataManager.themePreferenceMale = newThemeSetting else userDataManager.themePreferenceFemale = newThemeSetting
                             ThemeManager.updateThemePreferenceForGender(currentGender, newThemeSetting)
                             userDataManager.updateUserSetting(currentUser?.uid, fieldToUpdate, newThemeSetting.name)
-                        }
+                        },
+                        accentTheme = AccentTheme.fromStored(userDataManager.accentThemeKey),
+                        onAccentThemeChange = { theme -> userDataManager.updateAccentTheme(theme?.storedValue, currentUser) }
                     )
                 }
                 composable(AppRoutes.CREATE_NEW_LIST) {
@@ -624,8 +670,30 @@ fun MainAppContainer(
                         onBack = { bottomBarNavController.popBackStack() }
                     )
                 }
-                composable(AppRoutes.AD_REWARDS_SCREEN) {
-                    AdRewardsScreen(onNavigateBack = { bottomBarNavController.popBackStack() })
+                composable(AppRoutes.STATS) {
+                    StatsScreen(
+                        history = exerciseHistory,
+                        unitSystem = userDataManager.userUnitSystem,
+                        exerciseName = ::exerciseNameFor,
+                        onBack = { bottomBarNavController.popBackStack() },
+                        workouts = trainingHistory.workoutLogs
+                    )
+                }
+                composable(AppRoutes.PRO) {
+                    ProScreen(
+                        proSource = proAccess.source,
+                        adTimeBank = userDataManager.adTimeBank,
+                        supporterTips = userDataManager.supporterTips,
+                        prices = billing.prices,
+                        storeAvailable = billing.storeAvailable,
+                        onBuy = ::buy,
+                        onRestore = {
+                            billing.restorePurchases()
+                            Toast.makeText(context, "Checking Google Play for your purchases…", Toast.LENGTH_SHORT).show()
+                        },
+                        userId = currentUser?.uid,
+                        onBack = { bottomBarNavController.popBackStack() }
+                    )
                 }
                 composable(
                     route = AppRoutes.EXERCISE_DETAIL,
@@ -661,6 +729,17 @@ fun MainAppContainer(
             onDismiss = { celebration = null },
             modifier = Modifier.align(Alignment.TopCenter)
         )
+    }
+    billingMessage?.let { (title, message) ->
+        GlassDialog(
+            title = title,
+            message = message,
+            confirmText = "Nice",
+            onConfirm = { billingMessage = null },
+            onDismiss = { billingMessage = null },
+            dismissText = "Close"
+        )
+    }
     }
 }
 

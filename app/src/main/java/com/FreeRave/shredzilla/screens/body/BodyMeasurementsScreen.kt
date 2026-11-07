@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.body
 
+import com.FreeRave.shredzilla.pro.LocalProAccess
+import com.FreeRave.shredzilla.pro.ProLockedCard
 import com.FreeRave.shredzilla.models.MeasurementCadence
 import com.FreeRave.shredzilla.utils.BodyChange
 import com.FreeRave.shredzilla.utils.BodyInsights
@@ -96,6 +98,7 @@ fun BodyMeasurementsScreen(
     onBack: () -> Unit
 ) {
     val latest = measurements.firstOrNull()
+    val isPro = LocalProAccess.current.isPro
     // The value before the latest one, from whichever older session measured that slot
     fun previousOf(slot: MeasurementSlot): Double? = measurements.drop(1).firstNotNullOfOrNull { it.valueOf(slot) }
 
@@ -120,12 +123,21 @@ fun BodyMeasurementsScreen(
                     }
                 } else {
                     item { LatestCard(latest, measurements.drop(1).firstNotNullOfOrNull { it.bodyWeightKg }, ::previousOf, unitSystem) }
-                    bodyInsights(measurements, unitSystem)?.let { insights ->
-                        if (insights.verdict != null || insights.changes.isNotEmpty() || insights.sinceFirst.isNotEmpty() || insights.imbalance != null) {
-                            item { InsightsCard(insights, unitSystem) }
+                    if (isPro) {
+                        bodyInsights(measurements, unitSystem)?.let { insights ->
+                            if (insights.verdict != null || insights.changes.isNotEmpty() || insights.sinceFirst.isNotEmpty() || insights.imbalance != null) {
+                                item { InsightsCard(insights, unitSystem) }
+                            }
+                        }
+                        item { TrendCard(measurements, unitSystem) }
+                    } else {
+                        item {
+                            ProLockedCard(
+                                title = "Insights & trends",
+                                description = "What your weight and waist changes mean, right vs left balance and a chart for every site"
+                            )
                         }
                     }
-                    item { TrendCard(measurements, unitSystem) }
                     item {
                         Text(
                             "History",

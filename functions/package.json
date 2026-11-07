@@ -1,0 +1,15 @@
+{
+  "name": "dotshredzilla-functions",
+  "private": true,
+  "description": "Server side of DotShredzilla Pro: verifies AdMob rewarded-ad callbacks and grants Pro hours.",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "scripts": {
+    "test": "node --test",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.3.0"
+  }
+}

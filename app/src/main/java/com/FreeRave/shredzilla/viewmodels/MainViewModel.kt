@@ -86,6 +86,7 @@ class MainViewModel(
         userDataManager.resetForSignOut()
         trainingHistory.reset()
         ThemeManager.currentGenderTheme = null
+        ThemeManager.accentTheme = null
     }
 
     val userDataManager = UserDataManager(
@@ -97,6 +98,9 @@ class MainViewModel(
     )
 
     val trainingHistory = TrainingHistoryStore()
+
+    /** Pro lifetime and tips through Google Play; connected once for the app's lifetime. */
+    val billing = com.FreeRave.shredzilla.pro.BillingRepository(application.applicationContext).also { it.connect() }
 
     val timerManager = TimerManager(
         context = application.applicationContext,

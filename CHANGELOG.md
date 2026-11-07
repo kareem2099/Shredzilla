@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] — 2026-11-07
+
+### Added
+- **DotShredzilla Pro.** Pro for life is a one-time Google Play purchase (`pro_lifetime`, $4.99), restored automatically on new devices and reinstalls.
+- **Pro hours from ads.** One optional rewarded ad gives one hour of Pro. Hours stack up to 8 at a time, with at most 5 ads in any 24 hours. AdMob server-side verification calls the new `admobReward` Cloud Function, which checks Google's signature and banks the hour using server time; Firestore rules stop the app from writing Pro time itself.
+- **Training time.** Today shows how long you trained (workouts by their measured length, other sets grouped into sessions by the gaps between them), with each session's start and end. Stats show time this week and a Time view of the last 8 weeks.
+- **Supporter tips.** A pre-workout shot ($0.99), a protein scoop ($2.99) and a creatine tub ($4.99) are repeatable tips that add a Supporter badge. They don't unlock Pro.
+- **Training stats (Pro).** Hard sets per muscle this week, compared with last week and the 10–20 set range; estimated 1RM trend per exercise; sets and volume over the last 8 weeks.
+- **Accent themes (Pro).** Inferno, Ocean, Gold and Volt recolor accents, gradients and the background glow on top of the profile palette.
+- **Share card styles (Pro).** Midnight and Accent looks for workout summaries.
+
+### Fixed
+- Today numbered every set "1"; sets are now numbered 1, 2, 3… per exercise and side, warm-ups show "W", and a left + right pair counts as one set.
+
+### Changed
+- The next-set coach, last-session comparison ("Last time" and "+2 reps") and body insights and trend charts are now Pro. Free Pro previews show what each feature does.
+- Logging, lists, programs, workout mode, supersets, the rest timer, plate calculator, records, weekly goal, streaks, deload reminders, measurements, history and sharing stay free.
+- Version name **1.6.0**, version code **10**.
+
+### Removed
+- The app-open ad and the old "Earn rewards" screen. The app shows no ads unless you choose to watch one on the Pro page.
+
+---
+
 ## [1.5.1] — 2026-11-06
 
 ### Fixed

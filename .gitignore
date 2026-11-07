@@ -45,3 +45,8 @@ Articles/
 /marketing/google-play/preview/
 
 /marketing/google-play/vectors/
+
+# Cloud Functions
+functions/node_modules/
+firestore-debug.log
+firebase-debug.log

@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.exercises.composables
 
+import com.FreeRave.shredzilla.pro.LocalProAccess
+import com.FreeRave.shredzilla.pro.ProLockedCard
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.animation.AnimatedContent
@@ -123,7 +125,11 @@ fun RecordSetSheetContent(
             Text(exerciseName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = palette.content)
         }
 
-        if (suggestion != null && !isEditing) {
+        val isPro = LocalProAccess.current.isPro
+        if (suggestion != null && !isEditing && !isPro) {
+            ProLockedCard(title = "Next-set coach", description = "See the weight and reps to aim for, based on your last session")
+        }
+        if (suggestion != null && !isEditing && isPro) {
             val next = suggestion.next
             SuggestionCard(
                 suggestion = suggestion,

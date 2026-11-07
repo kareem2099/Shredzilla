@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.sets
 
+import androidx.compose.material.icons.filled.Insights
+import com.FreeRave.shredzilla.pro.ProPill
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
@@ -70,6 +72,7 @@ fun SetGraphScreen(
     onOpenRecords: () -> Unit,
     measurementCount: Int,
     onOpenBody: () -> Unit,
+    onOpenStats: () -> Unit = {},
     onNavigateToCreateNewList: () -> Unit,
     onNavigateToExerciseListDetail: (listId: String, listName: String) -> Unit,
     isTimerRunning: Boolean,
@@ -142,6 +145,15 @@ fun SetGraphScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+            }
+            item {
+                NavigationCard(
+                    icon = Icons.Filled.Insights,
+                    title = "Training stats",
+                    subtitle = "Sets per muscle, strength trend and weekly volume",
+                    onClick = onOpenStats,
+                    badge = { ProPill() }
+                )
             }
             item { ListsHeader(onCreateList = onNavigateToCreateNewList) }
             if (userExerciseLists.isEmpty()) {
@@ -243,7 +255,7 @@ private fun ListsHeader(onCreateList: () -> Unit) {
 }
 
 @Composable
-private fun NavigationCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+private fun NavigationCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit, badge: (@Composable () -> Unit)? = null) {
     val palette = MaterialTheme.glass
     GlassCard(
         modifier = Modifier
@@ -256,7 +268,10 @@ private fun NavigationCard(icon: ImageVector, title: String, subtitle: String, o
             GlassIconBadge(painter = rememberVectorPainter(icon), size = 52.dp)
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
+                    badge?.invoke()
+                }
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)

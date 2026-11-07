@@ -1,5 +1,7 @@
 package com.FreeRave.shredzilla.screens.workout
 
+import com.FreeRave.shredzilla.pro.LocalProAccess
+import com.FreeRave.shredzilla.pro.ProLockedCard
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.getValue
@@ -351,13 +353,17 @@ private fun CurrentExerciseCard(
             GlassChip(text = "${doneSets.workingSetCount()} done")
         }
         superset()
-        if (suggestion != null) {
+        val isPro = LocalProAccess.current.isPro
+        if (!isPro && (suggestion != null || lastSession.isNotEmpty())) {
+            ProLockedCard(title = "Coach & last time", description = "Your suggested next set, last session's sets and \"+2 reps\" on every set")
+        }
+        if (isPro && suggestion != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Filled.TipsAndUpdates, contentDescription = null, tint = palette.accent, modifier = Modifier.size(20.dp))
                 Text(suggestion, style = MaterialTheme.typography.bodyMedium, color = palette.content)
             }
         }
-        if (lastSession.isNotEmpty()) {
+        if (isPro && lastSession.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     "Last time · ${lastSessionLabel(lastSession.first().dateKey)}",
@@ -392,7 +398,7 @@ private fun CurrentExerciseCard(
                             color = palette.content,
                             modifier = Modifier.weight(0.6f)
                         )
-                        changeSinceLast(set, previous, unitSystem)?.let { change ->
+                        changeSinceLast(set, previous, unitSystem)?.takeIf { isPro }?.let { change ->
                             Text(
                                 change,
                                 style = MaterialTheme.typography.labelLarge,

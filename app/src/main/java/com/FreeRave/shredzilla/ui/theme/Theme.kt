@@ -180,7 +180,8 @@ fun ShredzillaTheme(
         else -> if (useDarkTheme) DefaultDarkColorScheme else DefaultLightColorScheme
     }
 
-    val colorScheme = when {
+    val accentTheme = ThemeManager.accentTheme
+    val chosenColorScheme = when {
         // If a specific gender theme is active, use it.
         currentGender != null -> baseColorScheme
         // Otherwise, if dynamic color is enabled and available, use it.
@@ -191,6 +192,9 @@ fun ShredzillaTheme(
         // Fallback to the base (default) scheme if no gender theme and no dynamic color.
         else -> baseColorScheme
     }
+    val colorScheme = accentTheme?.applyTo(chosenColorScheme, useDarkTheme) ?: chosenColorScheme
+    val basePalette = glassPaletteFor(currentGender, useDarkTheme)
+    val palette = accentTheme?.applyTo(basePalette) ?: basePalette
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -203,7 +207,7 @@ fun ShredzillaTheme(
         }
     }
 
-    CompositionLocalProvider(LocalGlassPalette provides glassPaletteFor(currentGender, useDarkTheme)) {
+    CompositionLocalProvider(LocalGlassPalette provides animateGlassPaletteAsState(palette)) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,

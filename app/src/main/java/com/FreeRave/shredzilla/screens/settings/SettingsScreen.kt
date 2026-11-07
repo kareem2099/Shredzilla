@@ -36,7 +36,11 @@ import androidx.compose.ui.unit.dp
 import com.FreeRave.shredzilla.BuildConfig
 import com.FreeRave.shredzilla.screens.account.composables.ProfileAvatar
 import com.FreeRave.shredzilla.ui.glass.GlassCard
-import com.FreeRave.shredzilla.ui.glass.GlassChip
+import com.FreeRave.shredzilla.pro.ProGoldSolid
+import com.FreeRave.shredzilla.pro.ProPill
+import com.FreeRave.shredzilla.pro.ProSource
+import com.FreeRave.shredzilla.pro.formatRemaining
+import com.FreeRave.shredzilla.screens.pro.SupporterBadge
 import com.FreeRave.shredzilla.ui.glass.GlassDefaults
 import com.FreeRave.shredzilla.ui.glass.GlassSettingsGroup
 import com.FreeRave.shredzilla.ui.glass.GlassSettingsRow
@@ -61,7 +65,10 @@ fun SettingsScreen(
     onNavigateToWorkoutReminders: () -> Unit,
     onNavigateToDefaultRestTimeSettings: () -> Unit,
     onNavigateToThemeSettings: () -> Unit,
-    onNavigateToAdRewards: () -> Unit
+    proSource: ProSource,
+    proRemainingMillis: Long,
+    isSupporter: Boolean,
+    onNavigateToPro: () -> Unit
 ) {
     val palette = MaterialTheme.glass
     Column(modifier = Modifier.fillMaxSize()) {
@@ -74,21 +81,26 @@ fun SettingsScreen(
                 .padding(top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            ProfileCard(userName, userEmail, profileImagePath, onClick = onNavigateToAccount)
+            ProfileCard(userName, userEmail, profileImagePath, isSupporter, onClick = onNavigateToAccount)
 
-            GlassSettingsGroup(title = "Support") {
-                GlassSettingsRow(
-                    icon = Icons.Filled.VolunteerActivism,
-                    title = "Earn rewards",
-                    subtitle = "Watch ads for an ad-free experience",
-                    onClick = onNavigateToAdRewards
-                )
+            GlassSettingsGroup(title = "Pro") {
                 GlassSettingsRow(
                     icon = Icons.Filled.WorkspacePremium,
-                    title = "Pro membership",
-                    onClick = { /* TODO: Pro membership */ },
-                    showChevron = false,
-                    trailing = { GlassChip(text = "Soon") }
+                    title = "DotShredzilla Pro",
+                    subtitle = when (proSource) {
+                        ProSource.LIFETIME -> "Pro for life. Thank you!"
+                        ProSource.AD_TIME -> "Pro on · ${formatRemaining(proRemainingMillis)} left"
+                        ProSource.NONE -> "Coach, insights, stats and themes"
+                    },
+                    tint = ProGoldSolid,
+                    onClick = onNavigateToPro,
+                    trailing = { if (proSource == ProSource.NONE) ProPill(text = "GET") else ProPill() }
+                )
+                GlassSettingsRow(
+                    icon = Icons.Filled.VolunteerActivism,
+                    title = "Support the developer",
+                    subtitle = "Pre-workout shot, protein scoop or a creatine tub",
+                    onClick = onNavigateToPro
                 )
             }
 
@@ -146,7 +158,7 @@ internal fun reminderLabel(setting: String): String =
     setting.substringBefore(" inactive").takeIf { it != setting }?.let { "After $it" } ?: setting
 
 @Composable
-private fun ProfileCard(userName: String?, userEmail: String?, imagePath: String?, onClick: () -> Unit) {
+private fun ProfileCard(userName: String?, userEmail: String?, imagePath: String?, isSupporter: Boolean, onClick: () -> Unit) {
     val palette = MaterialTheme.glass
     GlassCard(
         modifier = Modifier
@@ -170,6 +182,7 @@ private fun ProfileCard(userName: String?, userEmail: String?, imagePath: String
                 if (userEmail != null) {
                     Text(userEmail, style = MaterialTheme.typography.bodySmall, color = palette.contentMuted, maxLines = 1)
                 }
+                if (isSupporter) SupporterBadge(modifier = Modifier.padding(top = 6.dp))
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Account", tint = palette.contentMuted)
         }
@@ -193,7 +206,10 @@ private fun SettingsScreenPreview() {
             onNavigateToWorkoutReminders = {},
             onNavigateToDefaultRestTimeSettings = {},
             onNavigateToThemeSettings = {},
-            onNavigateToAdRewards = {}
+            proSource = ProSource.NONE,
+            proRemainingMillis = 0L,
+            isSupporter = true,
+            onNavigateToPro = {}
         )
     }
 }

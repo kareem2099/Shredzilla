@@ -12,6 +12,9 @@ object ThemeManager {
     var themePreferenceMale: ThemeSetting by mutableStateOf(ThemeSetting.SYSTEM)
     var themePreferenceFemale: ThemeSetting by mutableStateOf(ThemeSetting.SYSTEM)
 
+    /** Pro accent theme in effect, or null for the profile's own colors. Set by the main app while Pro. */
+    var accentTheme: AccentTheme? by mutableStateOf(null)
+
     fun updateThemePreferenceForGender(gender: String?, newSetting: ThemeSetting) {
         when (gender) {
             "Male" -> themePreferenceMale = newSetting

@@ -1,5 +1,11 @@
 package com.FreeRave.shredzilla.screens.today
 
+import androidx.compose.material.icons.filled.Timer
+import com.FreeRave.shredzilla.models.Side
+import com.FreeRave.shredzilla.models.WorkoutLog
+import com.FreeRave.shredzilla.utils.TrainingSession
+import com.FreeRave.shredzilla.utils.formatTrainingTime
+import com.FreeRave.shredzilla.utils.trainingSessions
 import com.FreeRave.shredzilla.utils.WeeklyProgress
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -99,7 +105,8 @@ fun TodayScreen(
     weeklyProgress: WeeklyProgress,
     showDeloadReminder: Boolean,
     onSetDeloadWeek: (Boolean) -> Unit,
-    onDismissDeloadReminder: () -> Unit
+    onDismissDeloadReminder: () -> Unit,
+    workouts: List<WorkoutLog> = emptyList()
 ) {
     val today = remember { startOfDay() }
     var selectedDay by rememberSaveable { mutableLongStateOf(today) }
@@ -139,7 +146,16 @@ fun TodayScreen(
         )
 
         val setsByExercise = remember(recordedSetsToday) {
-            recordedSetsToday.groupBy { it.exerciseName }.mapValues { (_, sets) -> sets.sortedBy { it.setNumber } }
+            recordedSetsToday.groupBy { it.exerciseName }.mapValues { (_, sets) -> sets.sortedBy { it.timestamp } }
+        }
+        // Workouts measure their own time; sets logged outside one are grouped into sessions by their gaps
+        val sessions = remember(recordedSetsToday, workouts, selectedDay) {
+            val dayEnd = selectedDay + TimeUnit.DAYS.toMillis(1)
+            trainingSessions(
+                setTimes = recordedSetsToday.map { it.timestamp.toDate().time },
+                workouts = workouts.filter { it.startedAtMillis in selectedDay until dayEnd }
+                    .map { TrainingSession(it.startedAtMillis, it.startedAtMillis + it.durationMillis) }
+            )
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -160,10 +176,29 @@ fun TodayScreen(
                 item { WeeklyGoalCard(weeklyProgress, onToggleDeload = { onSetDeloadWeek(!weeklyProgress.isDeloadWeek) }) }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    GlassStatTile(Icons.Filled.Repeat, "Reps", totalReps.toString(), Modifier.weight(1f))
-                    GlassStatTile(Icons.Filled.Layers, "Sets", totalSets.toString(), Modifier.weight(1f))
-                    GlassStatTile(Icons.Filled.FitnessCenter, "Exercises", uniqueExercises.toString(), Modifier.weight(1f))
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        GlassStatTile(
+                            Icons.Filled.Timer,
+                            if (sessions.size > 1) "Training time · ${sessions.size} sessions" else "Training time",
+                            formatTrainingTime(sessions.sumOf { it.durationMillis }),
+                            Modifier.weight(1f)
+                        )
+                        GlassStatTile(Icons.Filled.Layers, "Sets", totalSets.toString(), Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        GlassStatTile(Icons.Filled.Repeat, "Reps", totalReps.toString(), Modifier.weight(1f))
+                        GlassStatTile(Icons.Filled.FitnessCenter, "Exercises", uniqueExercises.toString(), Modifier.weight(1f))
+                    }
+                    if (sessions.isNotEmpty()) {
+                        val clock = remember { java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT) }
+                        Text(
+                            sessions.joinToString("   ·   ") { "${clock.format(Date(it.startMillis))} – ${clock.format(Date(it.endMillis))}" },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.glass.contentMuted,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
                 }
             }
             if (setsByExercise.isEmpty()) {
@@ -243,7 +278,9 @@ private fun ExerciseLogCard(
                     color = palette.contentMuted
                 )
             }
-            GlassChip(text = "${sets.size} ${if (sets.size == 1) "set" else "sets"}")
+            val working = sets.filter { it.setType != SetType.WARMUP }
+            val count = working.count { it.side == null } + maxOf(working.count { it.side == Side.LEFT }, working.count { it.side == Side.RIGHT })
+            GlassChip(text = "$count ${if (count == 1) "set" else "sets"}")
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)
         }
         sets.forEach { set -> SetRow(set, unitSystem) }
@@ -258,7 +295,7 @@ private fun SetRow(set: RecordedSet, unitSystem: UnitSystem) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(28.dp).glassSurface(palette, CircleShape)
         ) {
-            Text(set.setNumber.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = palette.accent)
+            Text(if (set.setNumber == 0) "W" else set.setNumber.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = palette.accent)
         }
         Spacer(Modifier.width(12.dp))
         Text(

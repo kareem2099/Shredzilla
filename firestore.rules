@@ -1,10 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Everything a user owns: profile, exercise library and lists, logged sets,
-    // workouts, records and body measurements. Nothing else is readable or writable.
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Pro time from ads is written only by the admobReward Cloud Function after AdMob
+    // confirms the ad was watched; the app can read these fields but never set them.
+    function serverOwned() {
+      return ['proUntil', 'proAdTimes', 'proAdTxns'];
+    }
+
+    // A user's own profile document
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(serverOwned());
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(serverOwned());
+
+      // Everything else a user owns: exercise library and lists, logged sets, workouts,
+      // records and body measurements. {collection} needs at least one segment, so this never
+      // matches the profile document itself. Nothing outside users/{uid} is readable or writable.
+      match /{collection}/{document=**} {
+        allow read, write: if isOwner(uid);
+      }
     }
   }
 }

@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import com.FreeRave.shredzilla.pro.AdTimeBank
 import com.FreeRave.shredzilla.models.UserExerciseList
 import com.FreeRave.shredzilla.models.RecordedSet
 import com.FreeRave.shredzilla.models.MeasurementCadence
@@ -74,6 +76,15 @@ class UserDataManager(
         private set
     var measurementCadence by mutableStateOf(MeasurementCadence.WEEKLY)
         private set
+    /** Pro time earned from rewarded ads (wall-clock end, the day it was counted for and ads watched that day). */
+    var adTimeBank by mutableStateOf(AdTimeBank())
+        private set
+    /** How many tips (consumable purchases) this account has sent; any tip shows the supporter badge. */
+    var supporterTips by mutableIntStateOf(0)
+        private set
+    /** Stored name of the chosen Pro accent theme, null for the profile's default colors. */
+    var accentThemeKey by mutableStateOf<String?>(null)
+        private set
     var themePreferenceMale by mutableStateOf(ThemeSetting.SYSTEM)
     var themePreferenceFemale by mutableStateOf(ThemeSetting.SYSTEM)
     var userExerciseLists by mutableStateOf<List<UserExerciseList>>(emptyList())
@@ -112,6 +123,9 @@ class UserDataManager(
         deloadWeeks = emptySet()
         deloadReminderDismissedWeek = null
         measurementCadence = MeasurementCadence.WEEKLY
+        adTimeBank = AdTimeBank()
+        supporterTips = 0
+        accentThemeKey = null
         themePreferenceMale = ThemeSetting.SYSTEM
         themePreferenceFemale = ThemeSetting.SYSTEM
         userExerciseLists = emptyList()
@@ -211,6 +225,13 @@ class UserDataManager(
                         deloadWeeks = (userDocSnapshot.get("deloadWeeks") as? List<String>).orEmpty().toSet()
                         deloadReminderDismissedWeek = userDocSnapshot.getString("deloadReminderDismissedWeek")
                         measurementCadence = MeasurementCadence.fromStored(userDocSnapshot.getString("measurementCadence"))
+                        adTimeBank = AdTimeBank(
+                            untilMillis = userDocSnapshot.getTimestamp("proUntil")?.toDate()?.time ?: 0L,
+                            adTimes = (userDocSnapshot.get("proAdTimes") as? List<*>).orEmpty()
+                                .mapNotNull { (it as? Timestamp)?.toDate()?.time },
+                        )
+                        supporterTips = userDocSnapshot.getLong("supporterTips")?.toInt() ?: 0
+                        accentThemeKey = userDocSnapshot.getString("accentTheme")
 
                         val oldThemeMale = themePreferenceMale
                         val oldThemeFemale = themePreferenceFemale
@@ -320,7 +341,7 @@ class UserDataManager(
                         currentSets.add(
                             RecordedSet(
                                 exerciseName = exName,
-                                setNumber = 1,
+                                setNumber = 0, // numbered below, once the day's order is known
                                 reps = reps,
                                 weight = weight,
                                 notes = notes,
@@ -338,11 +359,19 @@ class UserDataManager(
                         // Warm-ups are logged but don't count towards the day's totals
                         if (SetDocFields.setTypeOf(doc) != SetType.WARMUP) {
                             repsCount += reps
-                            setsCount++
                         }
                         if (exName.isNotBlank()) uniqueExNames.add(exName)
                     }
-                    todayRecordedSetsList = currentSets
+                    // Number working sets per exercise and side in the order they were logged (1, 2, 3…);
+                    // warm-ups get 0 and show as "W". A left + right pair counts as one set.
+                    val counters = mutableMapOf<Pair<String, Side?>, Int>()
+                    todayRecordedSetsList = currentSets.map { set ->
+                        if (set.setType == SetType.WARMUP) set.copy(setNumber = 0)
+                        else set.copy(setNumber = counters.merge(set.exerciseName to set.side, 1, Int::plus)!!)
+                    }
+                    setsCount = currentSets.filter { it.setType != SetType.WARMUP }.groupBy { it.exerciseName }.values.sumOf { sets ->
+                        sets.count { it.side == null } + maxOf(sets.count { it.side == Side.LEFT }, sets.count { it.side == Side.RIGHT })
+                    }
                     todayTotalReps = repsCount; todayTotalSets = setsCount; todayUniqueExercises =
                     uniqueExNames.size
                 }
@@ -578,6 +607,16 @@ class UserDataManager(
 
     fun dismissDeloadReminder(weekKey: String, currentUser: FirebaseUser?) =
         updateUserSetting(currentUser?.uid, "deloadReminderDismissedWeek", weekKey)
+
+    fun recordSupporterTip(currentUser: FirebaseUser?) {
+        supporterTips += 1
+        updateUserSetting(currentUser?.uid, "supporterTips", FieldValue.increment(1))
+    }
+
+    fun updateAccentTheme(key: String?, currentUser: FirebaseUser?) {
+        accentThemeKey = key
+        updateUserSetting(currentUser?.uid, "accentTheme", key ?: FieldValue.delete())
+    }
 
     fun updateMeasurementCadence(cadence: MeasurementCadence, currentUser: FirebaseUser?) =
         updateUserSetting(currentUser?.uid, "measurementCadence", cadence.storedValue)
