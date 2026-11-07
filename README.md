@@ -1,6 +1,6 @@
-# Shredzilla 🦖🏋️
+# DotShredzilla 🦖🏋️
 
-> A high-performance Android workout tracking application built for serious weightlifters who demand speed, reliability, and a crash-resistant experience.
+> Log your workouts, follow guided sessions and keep your training history, personal records and body measurements together.
 
 [![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://android.com)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)](https://kotlinlang.org)
@@ -16,6 +16,8 @@
 This update replaces broad gallery access with the Android system photo picker
 and corrects the registration links to the app-specific legal pages.
 
+- [Google Play](https://play.google.com/store/apps/details?id=com.FreeRave.shredzilla)
+- [DotSuite](https://dotsuite.dev)
 - [Terms of use](https://dotsuite.dev/en/dotshredzilla/terms)
 - [Privacy policy](https://dotsuite.dev/en/privacy#dotshredzilla)
 - [Account and data deletion](https://dotsuite.dev/en/privacy#delete-dotshredzilla)
@@ -24,34 +26,39 @@ and corrects the registration links to the app-specific legal pages.
 The legal pages support English, Arabic, German, French and Russian. Canonical
 terms are in [docs/legal](docs/legal/README.md). Native UI labels remain English.
 
+## Store listing
+
+English descriptions, six phone screenshots, four tablet screenshots
+and a feature graphic in English are in [fastlane/metadata/android](fastlane/metadata/android).
+The [artwork guide](marketing/google-play/README.md) explains the isolated demo
+capture and reproducible rendering workflow. Native app labels are in English.
+
+![DotShredzilla store artwork](marketing/google-play/contact-sheet.png)
+
 ## Overview
 
-Shredzilla replaces your workout notebook with a blazing-fast, offline-capable fitness tracker. It is engineered with a strict focus on **modern Android architecture**, **persistent state management**, and **seamless real-time data synchronization** — so your data is always safe, even in the deepest gym dead-zones.
-
----
+DotShredzilla is an Android workout tracker built with Kotlin and Jetpack Compose.
+Record your sets, follow a guided workout, and review session history, personal
+records and body measurements. Sets can be logged offline and synchronized with
+Firestore when a connection returns.
 
 ## Features
 
-### Core Workout Experience
-- **Offline-First Set Logging** — Record sets instantly with zero latency. Firebase's native offline persistence silently syncs to the cloud once connectivity is restored.
-- **Zero-Drift Rest Timer** — Delta-math anchored countdown timer (`endTime - currentTimeMillis`) guarantees atomic precision regardless of CPU load or background threading. Survives app minimization without losing a single second.
-- **Debounced Exercise Search** — Kotlin `StateFlow` with a 300ms debounce prevents keystroke input lag and eliminates ANR risk during heavy list filtering.
+- **Workout logging:** reps, kg/lb, plate counts, bodyweight and per-side loads;
+  warm-up, drop, rest-pause and failure sets, plus tempo and notes.
+- **Guided sessions:** custom exercise lists, ready-made programs, targets,
+  previous-session details, supersets and a rest timer.
+- **History and records:** session summaries, duration, volume, personal records,
+  charts and shareable workout summaries.
+- **Consistency:** weekly workout goals, activity history and deload reminders.
+- **Body measurements:** weight, measurements, left/right entries and trends.
+- **Account controls:** Google or email/password sign-in, cloud synchronization,
+  and deletion of the account and associated data from Settings.
+- **Appearance:** light and dark themes, with native English UI labels.
 
-### Architecture & Stability
-- **Process Death Resilience** — `SavedStateHandle` + `StateFlow` preserves navigation destination across OS-level app kills. Users always return to exactly where they left off.
-- **Configuration Change Safety** — `MainViewModel` owns `TimerManager` and `UserDataManager`, anchoring their lifecycle to `viewModelScope` — completely immune to screen rotations.
-- **Zero Memory Leaks** — A strict `ListenerRegistration` cache in `UserDataManager` systematically severs all Firestore snapshot observers on logout and account deletion.
-- **Atomic User Creation** — Firestore write failure during registration triggers an automatic Firebase Auth rollback, eliminating zombie accounts stuck in a broken state.
-
-### Authentication
-- **Multi-Provider Auth** — Supports Email/Password and Google Sign-In via Firebase Authentication.
-- **Smart Onboarding Resume** — Detects exactly which onboarding step a user completed last and resumes from there on next launch.
-- **Collision Detection** — Gracefully handles duplicate email errors across providers with a clear, actionable error message.
-
-### Analytics & Data
-- **Progress Chart** — Dynamic Y-axis clamping with gradient fill renders volume progression curves that accurately represent micro-improvements without visual distortion.
-- **Historical Analytics** — Background computation on `Dispatchers.Default` aggregates up to 90 days of set data with session-level caching to prevent redundant Firestore reads.
-- **Unit System Support** — Full Metric (kg) and Imperial (lbs) support with centralized `convertToStorageWeight` / `convertToDisplayWeight` helpers ensuring consistent storage in kg regardless of display preference.
+Training suggestions are general fitness guidance, not medical advice. The app
+contains advertising. See the linked privacy policy for data practices and
+account deletion details.
 
 ---
 

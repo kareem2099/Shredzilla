@@ -4,6 +4,12 @@ plugins {
     alias(libs.plugins.google.services) // Apply Google Services plugin
 }
 
+val storeListingCapture = providers.gradleProperty("storeListingCapture")
+    .map { it.toBoolean() }
+    .getOrElse(false)
+
+if (storeListingCapture) layout.buildDirectory.set(layout.projectDirectory.dir("build/storeCapture"))
+
 android {
     namespace = "com.FreeRave.shredzilla"
     compileSdk = 37
@@ -15,7 +21,11 @@ android {
         versionCode = 9
         versionName = "1.5.1"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = if (storeListingCapture) {
+            "com.FreeRave.shredzilla.review.StoreCaptureRunner"
+        } else {
+            "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
 
     signingConfigs {
@@ -45,7 +55,17 @@ android {
         }
     }
 
+    if (storeListingCapture) {
+        sourceSets.getByName("debug").manifest.srcFile("src/storeCapture/AndroidManifest.xml")
+    }
+
     buildTypes {
+        debug {
+            if (storeListingCapture) {
+                applicationIdSuffix = ".storecapture"
+                resValue("string", "default_web_client_id", "store-capture.invalid")
+            }
+        }
         release {
             isMinifyEnabled = true // Enabled for release
             isShrinkResources = true // Enabled for release
@@ -62,6 +82,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = storeListingCapture
         buildConfig = true
     }
 }
@@ -114,4 +135,10 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// Capture fixtures have a separate package and cannot access the network.
+// Release builds keep their normal Firebase configuration and application id.
+tasks.configureEach {
+    if (storeListingCapture && name == "processDebugGoogleServices") enabled = false
 }

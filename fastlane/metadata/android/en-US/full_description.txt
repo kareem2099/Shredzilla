@@ -1,0 +1,28 @@
+DotShredzilla keeps your training log, workout plans and progress in one place. Record sets as you train, follow a session and look back at the details later.
+
+LOG YOUR WORKOUT
+Record reps, weights and sets with support for kilograms, pounds, plate counts and bodyweight exercises. Keep warm-up, drop, rest-pause and failure sets clear in your log. A built-in rest timer helps you move between sets.
+
+TRAIN WITH A PLAN
+Create your own exercise lists or start from a ready-made training program. Follow a guided workout, see previous-session details and save a session summary when you finish. Supersets and tempo notes help you record how you trained.
+
+SEE YOUR TRAINING HISTORY
+Review exercises, total sets, session volume and duration. Find personal records and view charts of your logged training. Track your weekly workout goal and activity over time.
+
+KEEP MEASUREMENTS TOGETHER
+Record body measurements and bodyweight, review earlier entries and view changes over time. Choose metric or imperial units to suit your routine.
+
+YOUR ACCOUNT AND YOUR DATA
+Sign in with Google or email and password. Log sets offline; cloud synchronization resumes when a connection is available. Choose a light or dark theme. Native app labels are currently in English.
+
+You can delete your account and its associated data from the app settings. For an external deletion request, follow the account deletion instructions linked below. Ownership verification is required; verified requests are handled within 30 days after verification as described in the privacy policy.
+
+DotShredzilla is a workout logging tool. Training suggestions are general fitness guidance, not medical advice. The app contains ads.
+
+Google Play: https://play.google.com/store/apps/details?id=com.FreeRave.shredzilla
+Website: https://dotsuite.dev
+Support: support@dotsuite.dev
+Privacy: https://dotsuite.dev/en/privacy#dotshredzilla
+Terms: https://dotsuite.dev/en/dotshredzilla/terms
+Account deletion: https://dotsuite.dev/en/privacy#delete-dotshredzilla
+Source code: https://github.com/kareem2099/Shredzilla

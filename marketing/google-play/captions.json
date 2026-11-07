@@ -1,0 +1,26 @@
+{
+  "home": [
+    "Your training.\nIn one place.",
+    "Workouts, goals and recent activity."
+  ],
+  "workout": [
+    "One session.\nOne clear plan.",
+    "Log sets, reps and weights as you train."
+  ],
+  "today": [
+    "Show up.\nLog the work.",
+    "See today\u2019s sets and your weekly goal."
+  ],
+  "history": [
+    "Every session.\nIn detail.",
+    "Review exercises, volume and duration."
+  ],
+  "records": [
+    "Your best sets.\nEasy to find.",
+    "Keep your personal records together."
+  ],
+  "body": [
+    "Track measurements.\nOver time.",
+    "Keep a history of your body measurements."
+  ]
+}

@@ -1,0 +1,146 @@
+[
+  {
+    "file": "fastlane/metadata/android/en-US/images/phoneScreenshots/01-home.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 611243,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/phoneScreenshots/02-workout.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 654145,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/phoneScreenshots/03-today.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 624173,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/phoneScreenshots/04-history.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 613836,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/phoneScreenshots/05-records.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 586112,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/phoneScreenshots/06-body.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 616540,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/featureGraphic.png",
+    "size": [
+      1024,
+      500
+    ],
+    "bytes": 145318,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/tenInchScreenshots/01-tablet-home.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 743699,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/sevenInchScreenshots/01-tablet-home.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 743699,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/tenInchScreenshots/02-tablet-workout.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 712224,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/sevenInchScreenshots/02-tablet-workout.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 712224,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/tenInchScreenshots/03-tablet-history.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 707461,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/sevenInchScreenshots/03-tablet-history.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 707461,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/tenInchScreenshots/04-tablet-body.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 630180,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/sevenInchScreenshots/04-tablet-body.png",
+    "size": [
+      1080,
+      1920
+    ],
+    "bytes": 630180,
+    "mode": "RGB"
+  },
+  {
+    "file": "fastlane/metadata/android/en-US/images/icon.png",
+    "size": [
+      512,
+      512
+    ],
+    "bytes": 88964,
+    "mode": "RGB"
+  }
+]
