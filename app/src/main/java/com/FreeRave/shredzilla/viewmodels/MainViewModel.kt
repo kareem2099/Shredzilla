@@ -87,6 +87,10 @@ class MainViewModel(
         trainingHistory.reset()
         ThemeManager.currentGenderTheme = null
         ThemeManager.accentTheme = null
+        workout.clear()
+        // The next account must not get this one's reminders
+        com.FreeRave.shredzilla.notifications.ReminderStore(getApplication()).clear()
+        com.FreeRave.shredzilla.notifications.ReminderScheduler.cancelAll(getApplication())
     }
 
     val userDataManager = UserDataManager(
@@ -107,6 +111,32 @@ class MainViewModel(
         coroutineScope = viewModelScope,
         userRestTimePreferenceProvider = { userDataManager.userRestTimePreference }
     )
+
+    /** Set logging and the guided workout, shared by the screens and the workout notification. */
+    val workout by lazy {
+        com.FreeRave.shredzilla.workout.WorkoutController(
+            context = application.applicationContext,
+            scope = viewModelScope,
+            userDataManager = userDataManager,
+            trainingHistory = trainingHistory,
+            timerManager = timerManager,
+            billing = billing,
+            history = exerciseHistory,
+            refreshHistory = { FirebaseAuth.getInstance().currentUser?.uid?.let { loadHistoricalAnalytics(it, force = true) } },
+        )
+    }
+
+    /** Badges, judged in the background from the same data the screens use. */
+    val badges by lazy {
+        com.FreeRave.shredzilla.badges.BadgeTracker(
+            scope = viewModelScope,
+            userDataManager = userDataManager,
+            trainingHistory = trainingHistory,
+            billing = billing,
+            workout = workout,
+            history = exerciseHistory,
+        )
+    }
 
     // State Hoisting: Search Query & Debouncing for Exercises
     private val _searchQuery = MutableStateFlow("")

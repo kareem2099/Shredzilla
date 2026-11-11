@@ -14,7 +14,7 @@ class MyApplication : Application() {
         // Debug builds use the real ad unit, so the server-side reward callback can be tested end to
         // end, but always mark this device as a test device: AdMob then serves labelled test ads and
         // a developer's own views never count as real impressions.
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.AD_TEST_DEVICE) {
             MobileAds.setRequestConfiguration(
                 RequestConfiguration.Builder().setTestDeviceIds(listOf(adMobTestDeviceId())).build()
             )

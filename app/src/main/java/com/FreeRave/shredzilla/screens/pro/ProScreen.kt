@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.Blender
 import androidx.compose.material.icons.filled.Bolt
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Share
@@ -78,10 +80,11 @@ import com.FreeRave.shredzilla.ui.theme.glass
 private data class ProFeature(val icon: ImageVector, val title: String, val text: String)
 
 private val proFeatures = listOf(
-    ProFeature(Icons.Filled.Psychology, "Next-set coach", "Suggests your next weight and reps from your last session"),
-    ProFeature(Icons.Filled.CompareArrows, "Last-time comparison", "\"+2 reps\", \"+1 plate\" and last session's sets in workout mode"),
+    ProFeature(Icons.Filled.Psychology, "Next-set coach", "Your next weight and reps from your last session, in the app and on the lock screen"),
+    ProFeature(Icons.Filled.CompareArrows, "Last-time comparison", "\"+2 reps\", \"+1 plate\" and last session's sets, in workout mode and its notification"),
     ProFeature(Icons.Filled.Straighten, "Body insights", "Trend charts and what your weight and waist changes mean"),
-    ProFeature(Icons.Filled.AutoGraph, "Advanced stats", "Sets per muscle each week, estimated 1RM and volume trends"),
+    ProFeature(Icons.Filled.AutoGraph, "Advanced stats", "Sets per muscle each week, estimated 1RM, volume and training time trends"),
+    ProFeature(Icons.Filled.NotificationsActive, "Workout notification styles", "Rest focus and a progress bar across your workout, a live status-bar chip on Android 16"),
     ProFeature(Icons.Filled.Palette, "Accent themes", "Inferno, Ocean, Gold and Volt on top of your profile colors"),
     ProFeature(Icons.Filled.Share, "Share card styles", "Midnight and Accent looks for your workout summaries"),
 )
@@ -102,6 +105,7 @@ fun ProScreen(
     /** Firebase uid the server credits the ad hour to. */
     userId: String?,
     onBack: () -> Unit,
+    onOpenSupport: () -> Unit = {},
 ) {
     val palette = MaterialTheme.glass
     val now = rememberTickingNow()
@@ -115,7 +119,7 @@ fun ProScreen(
             Text("What Pro adds", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
             proFeatures.forEach { FeatureRow(it, unlocked = proSource != ProSource.NONE) }
             Text(
-                "Logging, lists, programs, workout mode, supersets, the rest timer, plate calculator, records, streaks and history stay free. No ads anywhere unless you choose to watch one here.",
+                "Logging, lists, programs, workout mode, supersets, logging from the lock screen, the rest timer, plate calculator, records, streaks, reminders, training time and history stay free. No ads anywhere unless you choose to watch one here.",
                 style = MaterialTheme.typography.bodySmall,
                 color = palette.contentMuted
             )
@@ -128,7 +132,7 @@ fun ProScreen(
             AdTimeCard(adTimeBank, now, userId)
         }
 
-        TipsCard(prices, onBuy)
+        SupportLinkCard(onOpenSupport)
 
         Text(
             "Restore purchases",
@@ -144,8 +148,7 @@ fun ProScreen(
         )
         GlassFootnote(
             "Payments are handled by Google Play. Pro for life belongs to your Google Play account and comes back on new devices. " +
-                "Ad hours are confirmed with Google and added to your DotShredzilla account by our server. They count down in real time, also while the app is closed, with up to ${ProCatalog.MAX_ADS_PER_DAY} ads in any 24 hours. " +
-                "Tips are optional thank-yous and don't unlock Pro."
+                "Ad hours are confirmed with Google and added to your DotShredzilla account by our server. They count down in real time, also while the app is closed, with up to ${ProCatalog.MAX_ADS_PER_DAY} ads in any 24 hours."
         )
         Spacer(Modifier.height(8.dp))
     }
@@ -395,33 +398,38 @@ private fun TimeBankMeter(hoursBanked: Float) {
     }
 }
 
+/** A one-line way to the separate Support page; tips live there, not on the Pro page. */
 @Composable
-private fun TipsCard(prices: Map<String, String>, onBuy: (String) -> Unit) {
+private fun SupportLinkCard(onClick: () -> Unit) {
     val palette = MaterialTheme.glass
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Fuel the developer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
-            Icon(Icons.Filled.Favorite, contentDescription = null, tint = Color(0xFFFF4F7B), modifier = Modifier.size(18.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassSurface(palette, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Icon(Icons.Filled.Favorite, contentDescription = null, tint = SupporterPink, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Support the developer", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = palette.content)
+            Text("Send a tip and get a Supporter badge", style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
         }
-        Text(
-            "DotShredzilla is built by one person. A tip says thanks, keeps updates coming and adds a Supporter badge to your profile. Tips don't unlock Pro.",
-            style = MaterialTheme.typography.bodySmall,
-            color = palette.contentMuted
-        )
-        SupportTip.entries.forEach { tip ->
-            TipRow(tip, price = prices[tip.productId] ?: tip.fallbackPrice, onClick = { onBuy(tip.productId) })
-        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)
     }
 }
 
-private val SupportTip.icon: ImageVector
+internal val SupporterPink = Color(0xFFFF4F7B)
+
+internal val SupportTip.icon: ImageVector
     get() = when (this) {
         SupportTip.PRE_WORKOUT -> Icons.Filled.Bolt
         SupportTip.PROTEIN -> Icons.Filled.Blender
         SupportTip.CREATINE -> Icons.Filled.Inventory2
     }
 
-private val SupportTip.tint: Color
+internal val SupportTip.tint: Color
     get() = when (this) {
         SupportTip.PRE_WORKOUT -> Color(0xFFFF7A45)
         SupportTip.PROTEIN -> Color(0xFF4FC3F7)
@@ -429,7 +437,7 @@ private val SupportTip.tint: Color
     }
 
 @Composable
-private fun TipRow(tip: SupportTip, price: String, onClick: () -> Unit) {
+internal fun TipRow(tip: SupportTip, price: String, onClick: () -> Unit) {
     val palette = MaterialTheme.glass
     Row(
         verticalAlignment = Alignment.CenterVertically,

@@ -5,6 +5,7 @@ import com.FreeRave.shredzilla.models.MeasurementSite
 import com.FreeRave.shredzilla.models.MeasurementSlot
 import com.FreeRave.shredzilla.models.Side
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.screens.settings.LengthUnit
 import kotlin.math.abs
 
 private const val WEIGHT_NOISE_KG = 0.5
@@ -35,7 +36,7 @@ private val TrackedSites = listOf(
     MeasurementSite.THIGH, MeasurementSite.CALF
 )
 
-private fun changes(from: BodyMeasurement, to: BodyMeasurement, unitSystem: UnitSystem): List<BodyChange> = buildList {
+private fun changes(from: BodyMeasurement, to: BodyMeasurement, unitSystem: UnitSystem, lengthUnit: LengthUnit): List<BodyChange> = buildList {
     val fromKg = from.bodyWeightKg
     val toKg = to.bodyWeightKg
     if (fromKg != null && toKg != null && abs(toKg - fromKg) >= WEIGHT_NOISE_KG) {
@@ -51,7 +52,7 @@ private fun changes(from: BodyMeasurement, to: BodyMeasurement, unitSystem: Unit
         add(
             BodyChange(
                 label = site.label.substringBefore(" ("),
-                change = "${if (diffCm > 0) "+" else "−"}${formatLength(abs(diffCm), unitSystem)}",
+                change = "${if (diffCm > 0) "+" else "−"}${formatLength(abs(diffCm), lengthUnit)}",
                 tone = if ((diffCm > 0) == grewIsGood) InsightTone.GOOD else InsightTone.WATCH
             )
         )
@@ -80,7 +81,7 @@ private fun verdictOf(from: BodyMeasurement, to: BodyMeasurement): String? {
 }
 
 /** The biggest right-vs-left gap worth acting on, e.g. "Right thigh is 5 cm bigger than the left". */
-private fun imbalanceOf(latest: BodyMeasurement, unitSystem: UnitSystem): String? =
+private fun imbalanceOf(latest: BodyMeasurement, lengthUnit: LengthUnit): String? =
     MeasurementSite.entries.filter { it.sided }.mapNotNull { site ->
         val right = latest.valueOf(MeasurementSlot(site, Side.RIGHT)) ?: return@mapNotNull null
         val left = latest.valueOf(MeasurementSlot(site, Side.LEFT)) ?: return@mapNotNull null
@@ -88,20 +89,20 @@ private fun imbalanceOf(latest: BodyMeasurement, unitSystem: UnitSystem): String
     }.filter { it.third >= IMBALANCE_WORTH_MENTIONING_CM }.maxByOrNull { it.third }?.let { (site, diff, gap) ->
         val bigger = if (diff > 0) "Right" else "Left"
         val smaller = if (diff > 0) "left" else "right"
-        "$bigger ${site.label.lowercase()} is ${formatLength(gap, unitSystem)} bigger than the $smaller. " +
+        "$bigger ${site.label.lowercase()} is ${formatLength(gap, lengthUnit)} bigger than the $smaller. " +
             "Train it one side at a time, start with the $smaller side and match its reps on the other."
     }
 
 /** [measurements] newest first. Needs two sessions for changes; the imbalance works from one. */
-fun bodyInsights(measurements: List<BodyMeasurement>, unitSystem: UnitSystem): BodyInsights? {
+fun bodyInsights(measurements: List<BodyMeasurement>, unitSystem: UnitSystem, lengthUnit: LengthUnit): BodyInsights? {
     val latest = measurements.firstOrNull() ?: return null
     val previous = measurements.getOrNull(1)
     val first = measurements.last().takeIf { measurements.size > 2 }
     return BodyInsights(
         verdict = previous?.let { verdictOf(it, latest) },
-        changes = previous?.let { changes(it, latest, unitSystem) }.orEmpty(),
-        sinceFirst = first?.let { changes(it, latest, unitSystem) }.orEmpty(),
+        changes = previous?.let { changes(it, latest, unitSystem, lengthUnit) }.orEmpty(),
+        sinceFirst = first?.let { changes(it, latest, unitSystem, lengthUnit) }.orEmpty(),
         firstDateMillis = first?.takenAtMillis,
-        imbalance = imbalanceOf(latest, unitSystem)
+        imbalance = imbalanceOf(latest, lengthUnit)
     )
 }

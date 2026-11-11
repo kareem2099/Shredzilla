@@ -56,6 +56,9 @@ import com.FreeRave.shredzilla.utils.sidePrefix
 import java.text.SimpleDateFormat
 import java.util.Locale
 import com.FreeRave.shredzilla.models.workingSetCount
+import com.FreeRave.shredzilla.models.completedSetCount
+import com.FreeRave.shredzilla.models.setNumbers
+import com.FreeRave.shredzilla.workout.WorkoutSession
 import com.FreeRave.shredzilla.screens.history.WorkoutLogContent
 import com.FreeRave.shredzilla.models.setsRangeLabel
 import com.FreeRave.shredzilla.screens.exercises.composables.RecordSetSheet
@@ -76,7 +79,7 @@ import com.FreeRave.shredzilla.utils.personalRecordIds
 import kotlinx.coroutines.delay
 
 /** The session as it's saved and shown in history; PRs use the trophy rule from the exercise page. */
-private fun buildWorkoutLog(
+internal fun buildWorkoutLog(
     listName: String,
     startedAt: Long,
     finishedAt: Long,
@@ -112,10 +115,8 @@ private fun buildWorkoutLog(
  */
 @Composable
 fun WorkoutScreen(
-    listName: String,
-    exercises: List<ExerciseDisplayInfo>,
-    /** Suggested sets per exercise (from a program), or null for hand-made lists. */
-    targetSets: IntRange?,
+    /** The running workout; it outlives this screen so the notification can keep logging. */
+    session: WorkoutSession,
     history: Map<String, List<LoggedSet>>,
     unitSystem: UnitSystem,
     isTimerRunning: Boolean,
@@ -123,44 +124,37 @@ fun WorkoutScreen(
     timerTotalSeconds: Int,
     onCloseTimer: () -> Unit,
     prefillFor: (exerciseName: String) -> SetPrefill,
-    onRecordSet: (exerciseName: String, entry: SetEntry, startRest: Boolean) -> Unit,
-    onSaveWorkout: (WorkoutLog) -> Unit,
-    onFinish: () -> Unit
+    /** Logs a set for the current exercise; the session handles supersets and the rest. */
+    onRecordSet: (entry: SetEntry) -> Unit,
+    /** Saves the workout; the screen then shows the summary. */
+    onFinishWorkout: () -> Unit,
+    onLeave: () -> Unit
 ) {
-    // History timestamps are whole seconds, so start on a whole second too
-    val startedAt = rememberSaveable { System.currentTimeMillis() / 1000 * 1000 }
-    var finishedAt by rememberSaveable { mutableLongStateOf(0L) }
-    var currentIndex by rememberSaveable { mutableIntStateOf(0) }
+    val listName = session.listName
+    val exercises = session.exercises
+    val targetSets = session.targetSets
+    val startedAt = session.startedAt
+    val finishedAt = session.finishedAt
     var isSheetOpen by remember { mutableStateOf(false) }
     var confirmFinish by remember { mutableStateOf(false) }
-    // Index of each superset's first exercise; it's paired with the one right after it
-    var supersetStarts by rememberSaveable { mutableStateOf(emptyList<Int>()) }
-    fun partnerOf(index: Int): Int? = when {
-        index in supersetStarts -> index + 1
-        index - 1 in supersetStarts -> index - 1
-        else -> null
-    }
+    fun partnerOf(index: Int): Int? = session.partnerOf(index)
 
-    val sessionSets = remember(history, exercises) {
-        exercises.associate { exercise ->
-            exercise.id to history[exercise.id].orEmpty().filter { it.timestampMillis >= startedAt }.sortedBy { it.timestampMillis }
-        }
-    }
+    val sessionSets = remember(history, exercises) { session.sessionSets(history) }
     val recordIds = remember(history, exercises) { exercises.flatMap { personalRecordIds(history[it.id].orEmpty()) }.toSet() }
     val totalSessionSets = sessionSets.values.sumOf { it.workingSetCount() }
 
     fun requestFinish() {
         when {
-            finishedAt > 0 || totalSessionSets == 0 -> onFinish() // nothing logged: just leave
+            finishedAt > 0 || totalSessionSets == 0 -> onLeave() // nothing logged: just leave
             else -> confirmFinish = true
         }
     }
     BackHandler(onBack = ::requestFinish)
 
-    val exercise = exercises.getOrNull(currentIndex.coerceIn(0, (exercises.size - 1).coerceAtLeast(0)))
+    val exercise = exercises.getOrNull(session.currentIndex.coerceIn(0, (exercises.size - 1).coerceAtLeast(0)))
     if (finishedAt > 0 || exercise == null) {
         val log = buildWorkoutLog(listName, startedAt, finishedAt.takeIf { it > 0 } ?: startedAt, exercises, sessionSets, recordIds)
-        WorkoutSummary(log, unitSystem, onDone = onFinish)
+        WorkoutSummary(log, unitSystem, onDone = onLeave)
         return
     }
 
@@ -180,15 +174,16 @@ fun WorkoutScreen(
             ?.sortedBy { it.timestampMillis }
             .orEmpty()
     }
-    val partner = partnerOf(currentIndex)?.let(exercises::getOrNull)
+    val partner = partnerOf(session.currentIndex)?.let(exercises::getOrNull)
     // A superset moves on as one block
-    val blockEnd = maxOf(currentIndex, partnerOf(currentIndex) ?: currentIndex)
+    val blockEnd = maxOf(session.currentIndex, partnerOf(session.currentIndex) ?: session.currentIndex)
     val isLast = blockEnd >= exercises.lastIndex
     val nextExercise = exercises.getOrNull(blockEnd + 1)
-    val doneCount = doneSets.workingSetCount()
+    // Toward the target a left/right set only counts once both sides are in, so the last right side isn't skipped
+    val doneCount = doneSets.completedSetCount()
     val targetMet = targetSets != null && doneCount >= targetSets.first &&
-        (partner == null || sessionSets[partner.id].orEmpty().workingSetCount() >= targetSets.first)
-    val canLinkNext = partner == null && currentIndex < exercises.lastIndex && partnerOf(currentIndex + 1) == null
+        (partner == null || sessionSets[partner.id].orEmpty().completedSetCount() >= targetSets.first)
+    val canLinkNext = partner == null && session.currentIndex < exercises.lastIndex && partnerOf(session.currentIndex + 1) == null
     val prefill = prefillFor(exercise.name)
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -203,10 +198,10 @@ fun WorkoutScreen(
         }
         ExerciseStrip(
             exercises = exercises,
-            currentIndex = currentIndex,
-            setsDone = { sessionSets[it].orEmpty().workingSetCount() },
+            currentIndex = session.currentIndex,
+            setsDone = { sessionSets[it].orEmpty().completedSetCount() },
             isInSuperset = { partnerOf(it) != null },
-            onSelect = { currentIndex = it }
+            onSelect = { session.currentIndex = it }
         )
         Column(
             modifier = Modifier
@@ -215,7 +210,7 @@ fun WorkoutScreen(
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             CurrentExerciseCard(
-                position = "Exercise ${currentIndex + 1} of ${exercises.size}",
+                position = "Exercise ${session.currentIndex + 1} of ${exercises.size}",
                 name = exercise.name,
                 targetSets = targetSets,
                 doneSets = doneSets,
@@ -228,12 +223,12 @@ fun WorkoutScreen(
                         partner != null -> GlassFilterChip(
                             text = "Superset with ${partner.name} ✕",
                             selected = true,
-                            onClick = { supersetStarts = supersetStarts - minOf(currentIndex, partnerOf(currentIndex)!!) }
+                            onClick = { session.supersetStarts = session.supersetStarts - minOf(session.currentIndex, partnerOf(session.currentIndex)!!) }
                         )
                         canLinkNext -> GlassFilterChip(
-                            text = "Superset with ${exercises[currentIndex + 1].name}",
+                            text = "Superset with ${exercises[session.currentIndex + 1].name}",
                             selected = false,
-                            onClick = { supersetStarts = supersetStarts + currentIndex }
+                            onClick = { session.supersetStarts = session.supersetStarts + session.currentIndex }
                         )
                     }
                 }
@@ -249,7 +244,7 @@ fun WorkoutScreen(
             // Once the target is met the main button moves on; logging more stays one tap away
             when {
                 targetMet && isLast -> GlassPrimaryButton(text = "Finish workout", onClick = ::requestFinish)
-                targetMet -> GlassPrimaryButton(text = "Next: ${nextExercise?.name}", onClick = { currentIndex = blockEnd + 1 })
+                targetMet -> GlassPrimaryButton(text = "Next: ${nextExercise?.name}", onClick = { session.currentIndex = blockEnd + 1 })
                 else -> GlassPrimaryButton(
                     // Mid-pair on a one-sided exercise, the next tap is the other side of the same set
                     text = prefill.initial.side?.let { "Log ${it.label.lowercase()} side" } ?: "Log set ${doneCount + 1}",
@@ -258,7 +253,7 @@ fun WorkoutScreen(
             }
             val secondary: Pair<String, () -> Unit>? = when {
                 targetMet -> "Log another set" to { isSheetOpen = true }
-                !isLast -> "Skip to ${nextExercise?.name}" to { currentIndex = blockEnd + 1 }
+                !isLast -> "Skip to ${nextExercise?.name}" to { session.currentIndex = blockEnd + 1 }
                 totalSessionSets > 0 -> "Finish workout" to ::requestFinish
                 else -> null
             }
@@ -273,13 +268,7 @@ fun WorkoutScreen(
         unitSystem = unitSystem,
         initial = prefill.initial,
         suggestion = prefill.suggestion,
-        onRecordSet = { name, entry ->
-            val partnerIndex = partnerOf(currentIndex)
-            // First half of a superset: straight to the partner, the rest comes after it
-            val isFirstHalf = partnerIndex != null && partnerIndex > currentIndex
-            onRecordSet(name, entry, !isFirstHalf)
-            if (partnerIndex != null) currentIndex = partnerIndex
-        },
+        onRecordSet = { _, entry -> onRecordSet(entry) },
         onDismiss = { isSheetOpen = false }
     )
 
@@ -292,8 +281,7 @@ fun WorkoutScreen(
             icon = rememberVectorPainter(Icons.Filled.EmojiEvents),
             onConfirm = {
                 confirmFinish = false
-                finishedAt = System.currentTimeMillis()
-                onSaveWorkout(buildWorkoutLog(listName, startedAt, finishedAt, exercises, sessionSets, recordIds))
+                onFinishWorkout()
             },
             onDismiss = { confirmFinish = false }
         )
@@ -348,9 +336,9 @@ private fun CurrentExerciseCard(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (targetSets != null) {
-                GlassChip(text = "Target ${setsRangeLabel(targetSets.first, targetSets.last)}", highlighted = doneSets.workingSetCount() >= targetSets.first)
+                GlassChip(text = "Target ${setsRangeLabel(targetSets.first, targetSets.last)}", highlighted = doneSets.completedSetCount() >= targetSets.first)
             }
-            GlassChip(text = "${doneSets.workingSetCount()} done")
+            GlassChip(text = "${doneSets.completedSetCount()} done")
         }
         superset()
         val isPro = LocalProAccess.current.isPro
@@ -379,14 +367,16 @@ private fun CurrentExerciseCard(
             Text("No sets yet. Log your first one when you're ready.", style = MaterialTheme.typography.bodyMedium, color = palette.contentMuted)
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val numbers = setNumbers(doneSets, { it.side }, { it.setType == SetType.WARMUP })
                 doneSets.forEachIndexed { index, set ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Each side counts its own working sets: Set 1 · Left, Set 1 · Right…; warm-ups aren't numbered
+                        // A left/right pair shares its number (Set 1 · Left, Set 1 · Right); warm-ups aren't numbered.
+                        // The comparison is with the same side's matching set from last time.
                         val isWarmup = set.setType == SetType.WARMUP
-                        val number = doneSets.take(index + 1).count { it.side == set.side && it.setType != SetType.WARMUP }
-                        val previous = if (isWarmup) null else lastSession.filter { it.side == set.side }.getOrNull(number - 1)
+                        val sideIndex = doneSets.take(index + 1).count { it.side == set.side && it.setType != SetType.WARMUP }
+                        val previous = if (isWarmup) null else lastSession.filter { it.side == set.side }.getOrNull(sideIndex - 1)
                         Text(
-                            (if (isWarmup) "Warm-up" else "Set $number") + set.side?.let { " · ${it.label}" }.orEmpty(),
+                            (if (isWarmup) "Warm-up" else "Set ${numbers[index]}") + set.side?.let { " · ${it.label}" }.orEmpty(),
                             style = MaterialTheme.typography.labelLarge,
                             color = palette.contentMuted,
                             modifier = Modifier.weight(0.4f)

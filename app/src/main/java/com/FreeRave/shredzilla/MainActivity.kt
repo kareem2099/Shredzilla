@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -53,6 +54,8 @@ class MainActivity : ComponentActivity() {
         // MobileAds.initialize removed from here — it's already in MyApplication
 
         NotificationUtils.createNotificationChannels(applicationContext)
+        com.FreeRave.shredzilla.notifications.AppNotifications.createChannels(applicationContext)
+        readNotificationRoute(intent)
         // Google Play updates plus the Remote Config minimum version; once per launch, not per rotation
         appUpdateController = AppUpdateController(this)
         if (savedInstanceState == null) appUpdateController.check()
@@ -100,6 +103,22 @@ class MainActivity : ComponentActivity() {
                 mainViewModel.updateStartDestination(AppRoutes.AUTH)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        readNotificationRoute(intent)
+    }
+
+    /** A tapped reminder carries the screen to open; the main app picks it up. */
+    private fun readNotificationRoute(intent: Intent?) {
+        if (intent?.getBooleanExtra(com.FreeRave.shredzilla.workout.WorkoutNotifier.EXTRA_FINISH, false) == true) {
+            com.FreeRave.shredzilla.notifications.PendingNavigation.finishWorkout = true
+            intent.removeExtra(com.FreeRave.shredzilla.workout.WorkoutNotifier.EXTRA_FINISH)
+        }
+        val route = intent?.getStringExtra(com.FreeRave.shredzilla.notifications.AppNotifications.EXTRA_OPEN_ROUTE) ?: return
+        com.FreeRave.shredzilla.notifications.PendingNavigation.route = route
+        intent.removeExtra(com.FreeRave.shredzilla.notifications.AppNotifications.EXTRA_OPEN_ROUTE)
     }
 
     override fun onResume() {

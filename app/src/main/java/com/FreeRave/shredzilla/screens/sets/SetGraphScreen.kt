@@ -1,6 +1,7 @@
 package com.FreeRave.shredzilla.screens.sets
 
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.MilitaryTech
 import com.FreeRave.shredzilla.pro.ProPill
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -73,6 +74,8 @@ fun SetGraphScreen(
     measurementCount: Int,
     onOpenBody: () -> Unit,
     onOpenStats: () -> Unit = {},
+    onOpenBadges: () -> Unit = {},
+    badgeSummary: String = "",
     onNavigateToCreateNewList: () -> Unit,
     onNavigateToExerciseListDetail: (listId: String, listName: String) -> Unit,
     isTimerRunning: Boolean,
@@ -153,6 +156,14 @@ fun SetGraphScreen(
                     subtitle = "Sets per muscle, strength trend and weekly volume",
                     onClick = onOpenStats,
                     badge = { ProPill() }
+                )
+            }
+            item {
+                NavigationCard(
+                    icon = Icons.Filled.MilitaryTech,
+                    title = "Badges",
+                    subtitle = badgeSummary.ifBlank { "Milestones, strength clubs and events" },
+                    onClick = onOpenBadges
                 )
             }
             item { ListsHeader(onCreateList = onNavigateToCreateNewList) }

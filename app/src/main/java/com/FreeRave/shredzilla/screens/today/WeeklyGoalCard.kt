@@ -81,7 +81,8 @@ fun WeeklyGoalCard(progress: WeeklyProgress, onToggleDeload: () -> Unit, modifie
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            GlassChip(text = "Week ${progress.weeksSinceDeload + 1} of $DELOAD_EVERY_WEEKS", modifier = Modifier.weight(1f, fill = false))
+            // Short enough to never wrap next to the deload button
+            GlassChip(text = "Week ${progress.weeksSinceDeload + 1}/$DELOAD_EVERY_WEEKS")
             Spacer(Modifier.weight(1f))
             GlassFilterChip(
                 text = if (progress.isDeloadWeek) "Deload week ✓" else "Mark as deload",

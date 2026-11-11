@@ -32,11 +32,14 @@ data class LoggedSet(
     val volume: Double get() = when {
         setType == SetType.WARMUP -> 0.0
         bodyweight -> reps.toDouble()
-        else -> reps * (plates?.toDouble() ?: weightKg)
+        else -> reps * (plates?.toDouble() ?: movedKg)
     }
 
     /** Kilograms moved, for "Volume" labels; warm-ups don't count. */
-    val volumeKg: Double get() = if (setType == SetType.WARMUP) 0.0 else reps * weightKg
+    val volumeKg: Double get() = if (setType == SetType.WARMUP) 0.0 else reps * movedKg
+
+    /** Load one rep moves: one arm or leg on a per-side machine only moves its own side's plates. */
+    private val movedKg: Double get() = movedKgOf(weightKg, perSide, side)
 }
 
 /** What kind of set it was. Warm-ups are logged but left out of set counts, volume and records. */
@@ -94,6 +97,37 @@ enum class Side(val label: String, private val stored: String) {
  * Sets as the user counts them: a left and a right set together make one, so "3 sets" of a
  * single-leg exercise is three per leg.
  */
+/** [weightKg] is the total of both sides for per-side sets, so a one-sided set moves half of it. */
+fun movedKgOf(weightKg: Double, perSide: Boolean, side: Side?): Double = if (perSide && side != null) weightKg / 2 else weightKg
+
+/**
+ * Set numbers in the order the sets were logged, counted the same way as [workingSetCount]:
+ * a left and a right set share a number (1, 1, 2, 2), sets done with both sides continue from
+ * there, and warm-ups get 0.
+ */
+fun <T> setNumbers(sets: List<T>, side: (T) -> Side?, isWarmup: (T) -> Boolean): List<Int> {
+    var both = 0
+    var left = 0
+    var right = 0
+    return sets.map { set ->
+        if (isWarmup(set)) return@map 0
+        when (side(set)) {
+            null -> { both++; both + maxOf(left, right) }
+            Side.LEFT -> { left++; both + left }
+            Side.RIGHT -> { right++; both + right }
+        }
+    }
+}
+
+/**
+ * Sets finished toward a target: a one-sided set only counts once both sides are logged, so
+ * Left, Right, Left is one finished set plus a half, not two.
+ */
+fun List<LoggedSet>.completedSetCount(): Int {
+    val working = filter { it.setType != SetType.WARMUP }
+    return working.count { it.side == null } + minOf(working.count { it.side == Side.LEFT }, working.count { it.side == Side.RIGHT })
+}
+
 fun List<LoggedSet>.workingSetCount(): Int {
     val working = filter { it.setType != SetType.WARMUP }
     return working.count { it.side == null } + maxOf(working.count { it.side == Side.LEFT }, working.count { it.side == Side.RIGHT })

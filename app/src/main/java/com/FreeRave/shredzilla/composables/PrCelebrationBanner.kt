@@ -44,7 +44,14 @@ import kotlinx.coroutines.delay
 private const val SHOW_MILLIS = 3500L
 
 /** A set that beat the exercise's best so far. [id] makes back-to-back records re-trigger. */
-data class PrCelebration(val exerciseName: String, val setLabel: String, val id: Long = System.nanoTime())
+data class PrCelebration(
+    val exerciseName: String,
+    val setLabel: String,
+    val id: Long = System.nanoTime(),
+    /** Badges reuse the banner with their own headline and emoji. */
+    val headline: String = "New personal record!",
+    val emoji: String? = null,
+)
 
 /** Slides in from the top over everything, buzzes, and leaves on its own (or on tap). */
 @Composable
@@ -89,12 +96,13 @@ fun PrCelebrationBanner(celebration: PrCelebration?, onDismiss: () -> Unit, modi
                     .clip(CircleShape)
                     .background(Brush.linearGradient(palette.accentGradient))
             ) {
-                Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = palette.onAccent)
+                if (record.emoji != null) Text(record.emoji, style = MaterialTheme.typography.titleLarge)
+                else Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = palette.onAccent)
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("New personal record!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
+                Text(record.headline, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
                 Text(
-                    "${record.exerciseName} · ${record.setLabel}",
+                    listOf(record.exerciseName, record.setLabel).filter { it.isNotBlank() }.joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = palette.contentMuted,
                     maxLines = 1,

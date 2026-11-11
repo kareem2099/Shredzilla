@@ -1,5 +1,11 @@
 package com.FreeRave.shredzilla.onboarding
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.runtime.mutableStateOf
+import com.FreeRave.shredzilla.screens.settings.LengthUnit
+import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.ui.glass.GlassFilterChip
+import com.FreeRave.shredzilla.utils.formatHeight
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,7 +46,11 @@ import com.FreeRave.shredzilla.ui.theme.glass
 
 private val AgeRange = 13..100
 private val HeightRangeCm = 120..230
+private val HeightRangeIn = 47..91
 private val WeightRangeKg = 30..250
+private val WeightRangeLb = 66..550
+private const val CM_PER_INCH = 2.54
+private const val LB_PER_KG = 2.20462
 
 /** Starting points near typical values so most people only nudge the rulers a little. */
 private fun defaultHeightCm(gender: String?) = if (gender == "Female") 163 else 176
@@ -49,14 +59,19 @@ private fun defaultWeightKg(gender: String?) = if (gender == "Female") 60 else 7
 /** Step 2 — age, height and weight on snapping rulers instead of free-text fields. */
 @Composable
 fun PhysicalDetailsScreen(
-    onDetailsSubmitted: (age: Int, heightCm: Int, weightKg: Int) -> Unit,
+    onDetailsSubmitted: (age: Int, heightCm: Int, weightKg: Int, weightUnit: UnitSystem, lengthUnit: LengthUnit) -> Unit,
     onBack: () -> Unit,
     isLoading: Boolean = false
 ) {
     val gender = ThemeManager.currentGenderTheme
     var age      by rememberSaveable { mutableIntStateOf(25) }
+    // Kept in centimetres and kilograms; the rulers show the chosen units, starting from the phone's region
     var heightCm by rememberSaveable { mutableIntStateOf(defaultHeightCm(gender)) }
     var weightKg by rememberSaveable { mutableIntStateOf(defaultWeightKg(gender)) }
+    var lengthUnit by rememberSaveable { mutableStateOf(LengthUnit.forLocale()) }
+    var weightUnit by rememberSaveable { mutableStateOf(UnitSystem.forLocale()) }
+    val inches = lengthUnit == LengthUnit.INCHES
+    val pounds = weightUnit == UnitSystem.IMPERIAL
 
     OnboardingScaffold(
         step = 2,
@@ -65,11 +80,36 @@ fun PhysicalDetailsScreen(
         ctaText = "Continue",
         ctaLoading = isLoading,
         onBack = onBack,
-        onCta = { onDetailsSubmitted(age, heightCm, weightKg) }
+        onCta = { onDetailsSubmitted(age, heightCm, weightKg, weightUnit, lengthUnit) }
     ) {
         MetricCard(Icons.Filled.Cake, "Age", age, "years", AgeRange) { age = it }
-        MetricCard(Icons.Filled.Height, "Height", heightCm, "cm", HeightRangeCm) { heightCm = it }
-        MetricCard(Icons.Filled.MonitorWeight, "Weight", weightKg, "kg", WeightRangeKg) { weightKg = it }
+        MetricCard(
+            icon = Icons.Filled.Height,
+            label = "Height",
+            value = if (inches) Math.round(heightCm / CM_PER_INCH).toInt() else heightCm,
+            unit = if (inches) "" else "cm",
+            range = if (inches) HeightRangeIn else HeightRangeCm,
+            display = { if (inches) formatHeight(Math.round(it * CM_PER_INCH).toInt(), LengthUnit.INCHES) else it.toString() },
+            units = listOf("cm", "ft/in"),
+            selectedUnit = if (inches) 1 else 0,
+            onUnitChange = { lengthUnit = if (it == 1) LengthUnit.INCHES else LengthUnit.CENTIMETRES },
+        ) { heightCm = if (inches) Math.round(it * CM_PER_INCH).toInt() else it }
+        MetricCard(
+            icon = Icons.Filled.MonitorWeight,
+            label = "Weight",
+            value = if (pounds) Math.round(weightKg * LB_PER_KG).toInt() else weightKg,
+            unit = if (pounds) "lb" else "kg",
+            range = if (pounds) WeightRangeLb else WeightRangeKg,
+            units = listOf("kg", "lb"),
+            selectedUnit = if (pounds) 1 else 0,
+            onUnitChange = { weightUnit = if (it == 1) UnitSystem.IMPERIAL else UnitSystem.METRIC },
+        ) { weightKg = if (pounds) Math.round(it / LB_PER_KG).toInt() else it }
+        Text(
+            "You can change units any time in Settings, Units.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.glass.contentMuted,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
     }
 }
 
@@ -80,6 +120,10 @@ private fun MetricCard(
     value: Int,
     unit: String,
     range: IntRange,
+    display: (Int) -> String = { it.toString() },
+    units: List<String> = emptyList(),
+    selectedUnit: Int = 0,
+    onUnitChange: (Int) -> Unit = {},
     onValueChange: (Int) -> Unit
 ) {
     val palette = MaterialTheme.glass
@@ -109,16 +153,31 @@ private fun MetricCard(
                 label = "${label}Value"
             ) { shown ->
                 Text(
-                    text = shown.toString(),
+                    text = display(shown),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = palette.content
                 )
             }
-            Spacer(Modifier.width(6.dp))
-            Text(text = unit, style = MaterialTheme.typography.titleSmall, color = palette.accent)
+            if (unit.isNotEmpty()) {
+                Spacer(Modifier.width(6.dp))
+                Text(text = unit, style = MaterialTheme.typography.titleSmall, color = palette.accent)
+            }
         }
-        RulerPicker(value = value, range = range, onValueChange = onValueChange)
+        if (units.size > 1) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(start = 70.dp, top = 6.dp)
+            ) {
+                units.forEachIndexed { index, name ->
+                    GlassFilterChip(text = name, selected = index == selectedUnit, onClick = { onUnitChange(index) })
+                }
+            }
+        }
+        // Keyed by range so switching units rebuilds the ruler at the converted value
+        androidx.compose.runtime.key(range) {
+            RulerPicker(value = value.coerceIn(range), range = range, onValueChange = onValueChange)
+        }
     }
 }
 
@@ -126,6 +185,6 @@ private fun MetricCard(
 @Composable
 private fun PhysicalDetailsPreview() {
     ShredzillaTheme {
-        PhysicalDetailsScreen(onDetailsSubmitted = { _, _, _ -> }, onBack = {})
+        PhysicalDetailsScreen(onDetailsSubmitted = { _, _, _, _, _ -> }, onBack = {})
     }
 }

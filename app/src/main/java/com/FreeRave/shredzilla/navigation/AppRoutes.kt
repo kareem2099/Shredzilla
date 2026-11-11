@@ -28,6 +28,8 @@ object AppRoutes {
     const val FITNESS_MAIN = "fitness_main" // Root for the main app content after auth/onboarding
     const val PRO = "pro" // Pro for life, ad hours and tips
     const val STATS = "stats" // Pro: advanced training stats
+    const val SUPPORT = "support" // Tips for the developer
+    const val BADGES = "badges" // Free badges and events
     const val PROGRAMS = "programs" // Ready-made splits
     const val WORKOUT = "workout/{listId}" // Guided session through one list
     const val WORKOUT_HISTORY = "workout_history"

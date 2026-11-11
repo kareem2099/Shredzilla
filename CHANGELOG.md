@@ -10,11 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
+- Translations: Arabic (right-to-left), Russian, German, French and Spanish, with an in-app language choice
 - Real workout activity indicators on `DayPill` strip
 - Per-exercise selector for the progress chart
-- LazyColumn pagination for large exercise lists
-- Screen transition animations
-- `SavedStateHandle` persistence for analytics graph data
+
+---
+
+## [1.7.0] — 2026-11-11
+
+### Added
+- **Badges, free for everyone.** 36 badges in milestones, training, strength, consistency, body and community: first set and workout, training days and sets, splits, supersets, one-sided sets, tempo, early-bird and night-owl sets, personal records, weight clubs (60–180 kg, or 135–405 lb), ten tonnes in a day, weekly-goal streaks, deloads, measurements, Founding member, Pro for life and Supporter tiers. A banner celebrates each new one; badges earned before are added quietly.
+- **Event badges** defined in Remote Config (`badge_events`), with a live card, countdown and progress; earned event badges stay on the account after the event. `founding_cutoff` sets the last sign-up date for Founding member.
+- **Live workout notification**: log the last set again, +1 rep, type a different set ("8" or "9 8"), move to the next exercise or finish, all from the lock screen, with the rest countdown inside. Four looks: Detailed and Compact (free), Rest focus and Progress bar (Pro; a Live Update chip on Android 16).
+- **Notifications**: the permission is requested on the first rest; workout reminders after the days you choose (opening the next day of your split), a weekly-goal alert on the last chance to hit it, measurement reminders following your rhythm and a Pro-time-ending alert. A Notifications page has a switch for each, a reminder time and quiet hours (10 PM–8 AM).
+- **Separate units** for weights (kg or lb) and body measurements (cm or in), also chosen during onboarding, defaulting to the phone's region.
+- **Support the developer** has its own page; the Pro page lists the newest Pro features.
+
+### Fixed
+- Today numbered every set "1"; left and right now share a number (1, 1, 2, 3) and warm-ups show "W". Set details are on their own line instead of cut off.
+- Workout mode moved on before the last right-side set; a one-sided set now counts only once both sides are logged.
+- One-sided sets on per-side machines counted double volume.
+- An exercise card's reps included warm-ups; the week chip wrapped onto two lines.
+- Records: more reps at the same load is a new best, and the trophy marks the day's best set.
+
+### Changed
+- The camera permission is gone: "Take photo" uses the system camera app.
+- Edge-to-edge: no deprecated status-bar color or full-screen splash in the themes.
+- R8 rules no longer keep whole libraries; the release bundle is about 900 KB smaller.
+- Version name **1.7.0**, version code **11**.
 
 ---
 

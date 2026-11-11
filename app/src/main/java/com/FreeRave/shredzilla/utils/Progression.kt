@@ -1,5 +1,6 @@
 package com.FreeRave.shredzilla.utils
 
+import kotlin.math.abs
 import com.FreeRave.shredzilla.models.LoggedSet
 import com.FreeRave.shredzilla.models.PersonalRecord
 import com.FreeRave.shredzilla.models.RecordSet
@@ -25,20 +26,33 @@ private val LoggedSet.load: Double get() = plates?.toDouble() ?: weightKg
 private val LoggedSet.countsForRecords: Boolean get() = !bodyweight && setType != SetType.WARMUP && load > 0
 
 /**
- * Doc ids of sets that beat every earlier set of the same exercise on load (heavier, or more
- * plates). The first loaded set of each kind isn't a record, there was nothing to beat yet.
- * [history] must be one exercise's sets, in any order.
+ * Doc ids of the best record set per day: sets that beat every earlier set of the same exercise
+ * (heavier, or more reps at the same load). The first loaded set of each kind isn't a record,
+ * there was nothing to beat yet. [history] must be one exercise's sets, in any order.
  */
 fun personalRecordIds(history: List<LoggedSet>): Set<String> {
-    val records = mutableSetOf<String>()
-    val best = mutableMapOf<Boolean, Double>()
+    // Each record beats the one before, so the last record of a day is that day's best;
+    // marking only it keeps one trophy per exercise and kind instead of one on every set
+    val recordOfDay = linkedMapOf<Pair<String, Boolean>, String>()
+    val best = mutableMapOf<Boolean, Pair<Double, Int>>()
     history.filter { it.countsForRecords }.sortedBy { it.timestampMillis }.forEach { set ->
         val previous = best[set.isPlates]
-        if (previous != null && set.load > previous + LOAD_EPSILON) records += set.docId
-        if (previous == null || set.load > previous) best[set.isPlates] = set.load
+        if (previous == null || beats(set.load, set.reps, previous.first, previous.second)) {
+            if (previous != null) recordOfDay[set.dateKey to set.isPlates] = set.docId
+            best[set.isPlates] = set.load to set.reps
+        }
     }
-    return records
+    return recordOfDay.values.toSet()
 }
+
+/**
+ * A record is the heaviest load; at the same load, more reps beat it. So 9 plates × 8 after
+ * 9 plates × 7 is a new best, while 8 plates × 12 isn't.
+ */
+private fun beats(load: Double, reps: Int, bestLoad: Double, bestReps: Int): Boolean =
+    load > bestLoad + LOAD_EPSILON || (abs(load - bestLoad) <= LOAD_EPSILON && reps > bestReps)
+
+private val bestFirst = compareBy<LoggedSet> { it.load }.thenBy { it.reps }
 
 enum class RecordCheck { NONE, FIRST, BEATEN }
 
@@ -51,19 +65,20 @@ fun checkRecord(history: List<LoggedSet>, stored: PersonalRecord?, entry: SetEnt
     val isPlates = entry.plates != null
     val load = entry.plates?.toDouble() ?: displayToKg(entry.weight, unitSystem)
     if (load <= 0 || entry.bodyweight || entry.setType == SetType.WARMUP) return RecordCheck.NONE
-    val storedBest = (if (isPlates) stored?.mostPlates else stored?.heaviest)?.load
-    val historyBest = history.filter { it.isPlates == isPlates && it.countsForRecords }.maxOfOrNull { it.load }
-    val previousBest = listOfNotNull(storedBest, historyBest).maxOrNull() ?: return RecordCheck.FIRST
-    return if (load > previousBest + LOAD_EPSILON) RecordCheck.BEATEN else RecordCheck.NONE
+    val storedBest = (if (isPlates) stored?.mostPlates else stored?.heaviest)?.let { it.load to it.reps }
+    val historyBest = history.filter { it.isPlates == isPlates && it.countsForRecords }.maxWithOrNull(bestFirst)?.let { it.load to it.reps }
+    val previousBest = listOfNotNull(storedBest, historyBest).maxWithOrNull(compareBy<Pair<Double, Int>> { it.first }.thenBy { it.second })
+        ?: return RecordCheck.FIRST
+    return if (beats(load, entry.reps, previousBest.first, previousBest.second)) RecordCheck.BEATEN else RecordCheck.NONE
 }
 
 /** Bests in [history] (per kind: true = plates) that the [stored] record doesn't cover yet. */
 fun recordsToBackfill(history: List<LoggedSet>, stored: PersonalRecord?): List<Pair<Boolean, RecordSet>> =
     listOf(false, true).mapNotNull { isPlates ->
         val best = history.filter { it.isPlates == isPlates && it.countsForRecords }
-            .maxWithOrNull(compareBy<LoggedSet> { it.load }.thenBy { it.reps }) ?: return@mapNotNull null
+            .maxWithOrNull(bestFirst) ?: return@mapNotNull null
         val storedBest = if (isPlates) stored?.mostPlates else stored?.heaviest
-        if (storedBest != null && best.load <= storedBest.load + LOAD_EPSILON) null
+        if (storedBest != null && !beats(best.load, best.reps, storedBest.load, storedBest.reps)) null
         else isPlates to RecordSet(best.load, best.reps, best.timestampMillis)
     }
 

@@ -1,19 +1,23 @@
 package com.FreeRave.shredzilla.utils
 
-import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.screens.settings.LengthUnit
 
 /** Measurements are stored in centimetres; like weights, the unit only affects input and display. */
 private const val CM_PER_INCH = 2.54
 
-fun UnitSystem.lengthUnit(): String = if (this == UnitSystem.IMPERIAL) "in" else "cm"
+fun cmToDisplay(cm: Double, unit: LengthUnit): Double = if (unit == LengthUnit.INCHES) cm / CM_PER_INCH else cm
 
-fun cmToDisplay(cm: Double, unitSystem: UnitSystem): Double = if (unitSystem == UnitSystem.IMPERIAL) cm / CM_PER_INCH else cm
-
-fun displayToCm(length: Double, unitSystem: UnitSystem): Double = if (unitSystem == UnitSystem.IMPERIAL) length * CM_PER_INCH else length
+fun displayToCm(length: Double, unit: LengthUnit): Double = if (unit == LengthUnit.INCHES) length * CM_PER_INCH else length
 
 /** A stored length in the user's unit, e.g. "40.5 cm". */
-fun formatLength(cm: Double, unitSystem: UnitSystem): String =
-    "${formatWeightNumber(cmToDisplay(cm, unitSystem))} ${unitSystem.lengthUnit()}"
+fun formatLength(cm: Double, unit: LengthUnit): String = "${formatWeightNumber(cmToDisplay(cm, unit))} ${unit.symbol}"
+
+/** Height for onboarding: "176 cm", or feet and inches like "5′9″". */
+fun formatHeight(cm: Int, unit: LengthUnit): String {
+    if (unit == LengthUnit.CENTIMETRES) return "$cm cm"
+    val inches = Math.round(cm / CM_PER_INCH).toInt()
+    return "${inches / 12}′${inches % 12}″"
+}
 
 /**
  * Typed number to a Double, accepting Arabic-Indic digits and a comma or Arabic decimal mark,

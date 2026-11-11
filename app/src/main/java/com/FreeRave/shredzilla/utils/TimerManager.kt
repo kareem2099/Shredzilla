@@ -10,6 +10,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +38,11 @@ class TimerManager(
         private set
     var timerTotalSeconds by mutableIntStateOf(60)
         private set
+    /** When the current rest ends (0 when not resting), for the workout notification's countdown. */
+    var restEndsAtMillis by mutableLongStateOf(0L)
+        private set
+    /** False while a workout is running: its own notification shows the countdown instead. */
+    var showOwnNotification: () -> Boolean = { true }
 
     private var timerJob: Job? = null
     private val wakeLock = context.getSystemService(PowerManager::class.java)
@@ -50,8 +56,9 @@ class TimerManager(
         timerTotalSeconds = duration
         timerRemainingSeconds = duration
         isTimerRunning = true
+        restEndsAtMillis = endsAt
         wakeLock.acquire(duration * 1000L + WAKE_LOCK_SLACK_MS)
-        NotificationUtils.showRestTimerNotification(context, endsAt)
+        if (showOwnNotification()) NotificationUtils.showRestTimerNotification(context, endsAt)
 
         timerJob = coroutineScope.launch {
             // Anchored to the end time, so a late tick never makes the timer drift
@@ -63,6 +70,7 @@ class TimerManager(
             }
             timerRemainingSeconds = 0
             isTimerRunning = false
+            restEndsAtMillis = 0L
             NotificationUtils.showRestOverNotification(context)
             vibrateRestOver()
             releaseWakeLock()
@@ -73,6 +81,7 @@ class TimerManager(
         timerJob?.cancel()
         isTimerRunning = false
         timerRemainingSeconds = 0
+        restEndsAtMillis = 0L
         NotificationUtils.cancelRestTimerNotification(context)
         releaseWakeLock()
     }

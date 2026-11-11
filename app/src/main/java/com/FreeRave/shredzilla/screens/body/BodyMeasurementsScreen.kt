@@ -7,7 +7,6 @@ import com.FreeRave.shredzilla.utils.BodyChange
 import com.FreeRave.shredzilla.utils.BodyInsights
 import com.FreeRave.shredzilla.utils.InsightTone
 import com.FreeRave.shredzilla.utils.bodyInsights
-import com.FreeRave.shredzilla.utils.lengthUnit
 import com.FreeRave.shredzilla.utils.weightUnit
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -51,6 +50,7 @@ import com.FreeRave.shredzilla.models.MeasurementSite
 import com.FreeRave.shredzilla.models.MeasurementSlot
 import com.FreeRave.shredzilla.models.Side
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.screens.settings.LengthUnit
 import com.FreeRave.shredzilla.ui.glass.GlassCard
 import com.FreeRave.shredzilla.ui.glass.GlassChip
 import com.FreeRave.shredzilla.ui.glass.GlassDefaults
@@ -91,6 +91,7 @@ private fun signed(value: Double): String? = when {
 fun BodyMeasurementsScreen(
     measurements: List<BodyMeasurement>,
     unitSystem: UnitSystem,
+    lengthUnit: LengthUnit,
     cadence: MeasurementCadence,
     onCadenceChange: (MeasurementCadence) -> Unit,
     onNew: () -> Unit,
@@ -122,14 +123,14 @@ fun BodyMeasurementsScreen(
                         }
                     }
                 } else {
-                    item { LatestCard(latest, measurements.drop(1).firstNotNullOfOrNull { it.bodyWeightKg }, ::previousOf, unitSystem) }
+                    item { LatestCard(latest, measurements.drop(1).firstNotNullOfOrNull { it.bodyWeightKg }, ::previousOf, unitSystem, lengthUnit) }
                     if (isPro) {
-                        bodyInsights(measurements, unitSystem)?.let { insights ->
+                        bodyInsights(measurements, unitSystem, lengthUnit)?.let { insights ->
                             if (insights.verdict != null || insights.changes.isNotEmpty() || insights.sinceFirst.isNotEmpty() || insights.imbalance != null) {
                                 item { InsightsCard(insights, unitSystem) }
                             }
                         }
-                        item { TrendCard(measurements, unitSystem) }
+                        item { TrendCard(measurements, unitSystem, lengthUnit) }
                     } else {
                         item {
                             ProLockedCard(
@@ -170,7 +171,8 @@ private fun LatestCard(
     latest: BodyMeasurement,
     previousBodyWeightKg: Double?,
     previousOf: (MeasurementSlot) -> Double?,
-    unitSystem: UnitSystem
+    unitSystem: UnitSystem,
+    lengthUnit: LengthUnit
 ) {
     val palette = MaterialTheme.glass
     GlassCard(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -195,15 +197,15 @@ private fun LatestCard(
             val left = latest.valueOf(MeasurementSlot(site, Side.LEFT))
             // Which side is bigger and by how much, e.g. "Right +5"
             val imbalance = if (site.sided && right != null && left != null) {
-                signed(cmToDisplay(right - left, unitSystem))?.let { "Right $it" }
+                signed(cmToDisplay(right - left, lengthUnit))?.let { "Right $it" }
             } else null
             SiteBlock(label = site.label, imbalance = imbalance) {
                 site.slots.forEach { slot ->
                     val value = latest.valueOf(slot)
                     SlotValue(
                         caption = slot.side?.label,
-                        value = value?.let { formatLength(it, unitSystem) } ?: "—",
-                        change = value?.let { v -> previousOf(slot)?.let { signed(cmToDisplay(v - it, unitSystem)) } },
+                        value = value?.let { formatLength(it, lengthUnit) } ?: "—",
+                        change = value?.let { v -> previousOf(slot)?.let { signed(cmToDisplay(v - it, lengthUnit)) } },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -240,7 +242,7 @@ private fun SlotValue(caption: String?, value: String, change: String?, modifier
 
 /** Trend of one site (one side at a time) across every session that measured it. */
 @Composable
-private fun TrendCard(measurements: List<BodyMeasurement>, unitSystem: UnitSystem) {
+private fun TrendCard(measurements: List<BodyMeasurement>, unitSystem: UnitSystem, lengthUnit: LengthUnit) {
     val palette = MaterialTheme.glass
     val oldestFirst = remember(measurements) { measurements.sortedBy { it.takenAtMillis } }
     // Only what was measured at least twice has a trend to draw; body weight comes first
@@ -257,11 +259,11 @@ private fun TrendCard(measurements: List<BodyMeasurement>, unitSystem: UnitSyste
     val slot = site?.let { MeasurementSlot(it, if (it.sided) side else null) }
     // Values in the user's unit, oldest first
     val series = oldestFirst.mapNotNull { m ->
-        val value = if (slot == null) m.bodyWeightKg?.let { kgToDisplay(it, unitSystem) } else m.valueOf(slot)?.let { cmToDisplay(it, unitSystem) }
+        val value = if (slot == null) m.bodyWeightKg?.let { kgToDisplay(it, unitSystem) } else m.valueOf(slot)?.let { cmToDisplay(it, lengthUnit) }
         value?.let { m.takenAtMillis to it }
     }
     val points = series.map { (at, value) -> MainViewModel.ChartDataPoint(at, value) }
-    val unitLabel = if (slot == null) unitSystem.weightUnit() else unitSystem.lengthUnit()
+    val unitLabel = if (slot == null) unitSystem.weightUnit() else lengthUnit.symbol
 
     GlassCard(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Trend", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)

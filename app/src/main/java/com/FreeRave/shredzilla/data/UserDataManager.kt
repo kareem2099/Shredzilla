@@ -10,14 +10,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import com.FreeRave.shredzilla.pro.AdTimeBank
+import com.FreeRave.shredzilla.badges.BadgeEvent
+import com.FreeRave.shredzilla.badges.BadgeStats
+import com.FreeRave.shredzilla.notifications.NotificationChoices
+import com.FreeRave.shredzilla.notifications.WorkoutNotificationStyle
+import com.FreeRave.shredzilla.screens.settings.parseReminderDays
+import com.FreeRave.shredzilla.screens.settings.reminderSettingOf
 import com.FreeRave.shredzilla.models.UserExerciseList
 import com.FreeRave.shredzilla.models.RecordedSet
 import com.FreeRave.shredzilla.models.MeasurementCadence
 import com.FreeRave.shredzilla.models.SetEntry
 import com.FreeRave.shredzilla.models.SetType
 import com.FreeRave.shredzilla.models.Side
+import com.FreeRave.shredzilla.models.setNumbers
 import com.FreeRave.shredzilla.screens.settings.ThemeSetting
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.screens.settings.LengthUnit
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldValue
@@ -66,6 +74,8 @@ class UserDataManager(
     val lastPerformedTimestampsMap = mutableStateMapOf<String, Timestamp>()
     var userProfileImageLocalPath by mutableStateOf<String?>(null)
     var userUnitSystem by mutableStateOf(UnitSystem.METRIC)
+    /** Body measurements and height; separate from weights since 1.6.1. */
+    var userLengthUnit by mutableStateOf(LengthUnit.CENTIMETRES)
     var userWorkoutReminderSetting by mutableStateOf("Never")
     var userWeeklyGoalDays by mutableStateOf<Int?>(null)
     /** Week keys (first day of the week) the user marked as deload weeks. */
@@ -81,6 +91,19 @@ class UserDataManager(
         private set
     /** How many tips (consumable purchases) this account has sent; any tip shows the supporter badge. */
     var supporterTips by mutableIntStateOf(0)
+        private set
+    /** Which reminders are on and when they arrive; the inactivity part lives in [userWorkoutReminderSetting]. */
+    var notificationChoices by mutableStateOf(NotificationChoices())
+        private set
+    /** Badges on the account (id to earned time), event badges' details, and the all-time counters behind them. */
+    var earnedBadges by mutableStateOf<Map<String, Long>>(emptyMap())
+        private set
+    var eventBadgeDetails by mutableStateOf<Map<String, BadgeEvent>>(emptyMap())
+        private set
+    var badgeStats by mutableStateOf(BadgeStats())
+        private set
+    /** False until the user document arrived, so badges aren't judged before what's already earned is known. */
+    var badgesLoaded by mutableStateOf(false)
         private set
     /** Stored name of the chosen Pro accent theme, null for the profile's default colors. */
     var accentThemeKey by mutableStateOf<String?>(null)
@@ -118,6 +141,7 @@ class UserDataManager(
         userRestTimePreference = "1min"
         userProfileImageLocalPath = null
         userUnitSystem = UnitSystem.METRIC
+        userLengthUnit = LengthUnit.CENTIMETRES
         userWorkoutReminderSetting = "Never"
         userWeeklyGoalDays = null
         deloadWeeks = emptySet()
@@ -125,6 +149,11 @@ class UserDataManager(
         measurementCadence = MeasurementCadence.WEEKLY
         adTimeBank = AdTimeBank()
         supporterTips = 0
+        notificationChoices = NotificationChoices()
+        earnedBadges = emptyMap()
+        eventBadgeDetails = emptyMap()
+        badgeStats = BadgeStats()
+        badgesLoaded = false
         accentThemeKey = null
         themePreferenceMale = ThemeSetting.SYSTEM
         themePreferenceFemale = ThemeSetting.SYSTEM
@@ -215,6 +244,7 @@ class UserDataManager(
                                 Log.w("Firestore", "Invalid unit system: $it")
                             }
                         }
+                        userLengthUnit = LengthUnit.fromStored(userDocSnapshot.getString("lengthUnit"), userUnitSystem)
                         // Stored as the onboarding label ("3 times per week"); its position is days - 1
                         userWeeklyGoalDays = workoutFrequencyOptions
                             .indexOf(userDocSnapshot.getString("weeklyGoalFrequency"))
@@ -232,6 +262,35 @@ class UserDataManager(
                         )
                         supporterTips = userDocSnapshot.getLong("supporterTips")?.toInt() ?: 0
                         accentThemeKey = userDocSnapshot.getString("accentTheme")
+                        earnedBadges = (userDocSnapshot.get("badges") as? Map<*, *>).orEmpty()
+                            .mapNotNull { (k, v) -> (k as? String)?.let { id -> (v as? Timestamp)?.toDate()?.time?.let { id to it } } }.toMap()
+                        eventBadgeDetails = (userDocSnapshot.get("eventBadges") as? Map<*, *>).orEmpty().mapNotNull { (k, v) ->
+                            val id = k as? String ?: return@mapNotNull null
+                            val m = v as? Map<*, *> ?: return@mapNotNull null
+                            id to BadgeEvent(
+                                id = id.removePrefix("event_"), title = m["title"] as? String ?: "Event",
+                                emoji = m["emoji"] as? String ?: "🎖️", description = m["description"] as? String ?: "",
+                                startsAt = 0L, endsAt = 0L, goalType = "open", goal = 1,
+                            )
+                        }.toMap()
+                        (userDocSnapshot.get("stats") as? Map<*, *>)?.let { st ->
+                            badgeStats = BadgeStats(
+                                trainingDays = (st["trainingDays"] as? Number)?.toInt() ?: 0,
+                                sets = (st["sets"] as? Number)?.toInt() ?: 0,
+                                records = (st["records"] as? Number)?.toInt() ?: 0,
+                                lastTrainingDay = st["lastTrainingDay"] as? String,
+                            )
+                        }
+                        badgesLoaded = true
+                        notificationChoices = NotificationChoices(
+                            reminderDays = parseReminderDays(userDocSnapshot.getString("workoutReminder") ?: "Never"),
+                            reminderHour = userDocSnapshot.getLong("reminderHour")?.toInt() ?: NotificationChoices.DEFAULT_REMINDER_HOUR,
+                            weeklyGoal = userDocSnapshot.getBoolean("notifyWeeklyGoal") ?: true,
+                            measurements = userDocSnapshot.getBoolean("notifyMeasurements") ?: true,
+                            proEnding = userDocSnapshot.getBoolean("notifyProEnding") ?: true,
+                            workoutNotification = userDocSnapshot.getBoolean("workoutNotification") ?: true,
+                            workoutStyle = WorkoutNotificationStyle.fromStored(userDocSnapshot.getString("workoutNotificationStyle")),
+                        )
 
                         val oldThemeMale = themePreferenceMale
                         val oldThemeFemale = themePreferenceFemale
@@ -362,13 +421,12 @@ class UserDataManager(
                         }
                         if (exName.isNotBlank()) uniqueExNames.add(exName)
                     }
-                    // Number working sets per exercise and side in the order they were logged (1, 2, 3…);
-                    // warm-ups get 0 and show as "W". A left + right pair counts as one set.
-                    val counters = mutableMapOf<Pair<String, Side?>, Int>()
-                    todayRecordedSetsList = currentSets.map { set ->
-                        if (set.setType == SetType.WARMUP) set.copy(setNumber = 0)
-                        else set.copy(setNumber = counters.merge(set.exerciseName to set.side, 1, Int::plus)!!)
-                    }
+                    // Number each exercise's working sets in the order they were logged: a left + right
+                    // pair shares a number (1, 1, 2, 2) and warm-ups get 0, shown as "W"
+                    val numberByDocId = currentSets.groupBy { it.exerciseName }.values.flatMap { sets ->
+                        sets.zip(setNumbers(sets, { it.side }, { it.setType == SetType.WARMUP }))
+                    }.associate { (set, number) -> set.firestoreDocId to number }
+                    todayRecordedSetsList = currentSets.map { it.copy(setNumber = numberByDocId[it.firestoreDocId] ?: 0) }
                     setsCount = currentSets.filter { it.setType != SetType.WARMUP }.groupBy { it.exerciseName }.values.sumOf { sets ->
                         sets.count { it.side == null } + maxOf(sets.count { it.side == Side.LEFT }, sets.count { it.side == Side.RIGHT })
                     }
@@ -611,6 +669,79 @@ class UserDataManager(
     fun recordSupporterTip(currentUser: FirebaseUser?) {
         supporterTips += 1
         updateUserSetting(currentUser?.uid, "supporterTips", FieldValue.increment(1))
+    }
+
+    /** Saves every notification choice at once; the inactivity reminder keeps its old string format. */
+    fun updateNotificationChoices(choices: NotificationChoices, currentUser: FirebaseUser?) {
+        notificationChoices = choices
+        userWorkoutReminderSetting = reminderSettingOf(choices.reminderDays)
+        val uid = currentUser?.uid ?: return
+        db.collection("users").document(uid).set(
+            hashMapOf(
+                "workoutReminder" to userWorkoutReminderSetting,
+                "reminderHour" to choices.reminderHour,
+                "notifyWeeklyGoal" to choices.weeklyGoal,
+                "notifyMeasurements" to choices.measurements,
+                "notifyProEnding" to choices.proEnding,
+                "workoutNotification" to choices.workoutNotification,
+                "workoutNotificationStyle" to choices.workoutStyle.storedValue,
+            ),
+            SetOptions.merge()
+        ).addOnFailureListener { e -> Log.e("Firestore", "Failed to save notification settings", e) }
+    }
+
+    /** Adds newly earned badges; event badges also keep their title and emoji for when the event is gone. */
+    fun saveEarnedBadges(earned: Map<String, Long>, events: Map<String, BadgeEvent>, currentUser: FirebaseUser?) {
+        if (earned.isEmpty()) return
+        earnedBadges = earnedBadges + earned
+        val uid = currentUser?.uid ?: return
+        val data = hashMapOf<String, Any>("badges" to earned.mapValues { Timestamp(Date(it.value)) })
+        if (events.isNotEmpty()) {
+            data["eventBadges"] = events.mapValues { (_, e) -> mapOf("title" to e.title, "emoji" to e.emoji, "description" to e.description) }
+            eventBadgeDetails = eventBadgeDetails + events
+        }
+        db.collection("users").document(uid).set(data, SetOptions.merge())
+            .addOnFailureListener { e -> Log.e("Firestore", "Failed to save badges", e) }
+    }
+
+    /** Counts a logged set toward the all-time counters (a new training day, a working set, a beaten record). */
+    fun countForBadges(todayKey: String, workingSet: Boolean, beatRecord: Boolean, currentUser: FirebaseUser?) {
+        val uid = currentUser?.uid ?: return
+        val newDay = badgeStats.lastTrainingDay != todayKey && workingSet
+        badgeStats = badgeStats.copy(
+            trainingDays = badgeStats.trainingDays + if (newDay) 1 else 0,
+            sets = badgeStats.sets + if (workingSet) 1 else 0,
+            records = badgeStats.records + if (beatRecord) 1 else 0,
+            lastTrainingDay = if (workingSet) todayKey else badgeStats.lastTrainingDay,
+        )
+        val stats = buildMap<String, Any> {
+            if (workingSet) put("sets", FieldValue.increment(1))
+            if (newDay) {
+                put("trainingDays", FieldValue.increment(1))
+                put("lastTrainingDay", todayKey)
+            }
+            if (beatRecord) put("records", FieldValue.increment(1))
+        }
+        if (stats.isNotEmpty()) {
+            db.collection("users").document(uid).set(mapOf("stats" to stats), SetOptions.merge())
+                .addOnFailureListener { e -> Log.e("Firestore", "Failed to count for badges", e) }
+        }
+    }
+
+    /** Lifts the counters to at least what the loaded history shows, for accounts from before badges. */
+    fun raiseBadgeStats(trainingDays: Int, sets: Int, records: Int, currentUser: FirebaseUser?) {
+        val raised = badgeStats.copy(
+            trainingDays = maxOf(badgeStats.trainingDays, trainingDays),
+            sets = maxOf(badgeStats.sets, sets),
+            records = maxOf(badgeStats.records, records),
+        )
+        if (raised == badgeStats) return
+        badgeStats = raised
+        val uid = currentUser?.uid ?: return
+        db.collection("users").document(uid).set(
+            mapOf("stats" to mapOf("trainingDays" to raised.trainingDays, "sets" to raised.sets, "records" to raised.records)),
+            SetOptions.merge()
+        )
     }
 
     fun updateAccentTheme(key: String?, currentUser: FirebaseUser?) {

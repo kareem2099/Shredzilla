@@ -18,8 +18,8 @@ android {
         applicationId = "com.FreeRave.shredzilla"
         minSdk = 29
         targetSdk = 37
-        versionCode = 10
-        versionName = "1.6.0"
+        versionCode = 11
+        versionName = "1.7.0"
 
         testInstrumentationRunner = if (storeListingCapture) {
             "com.FreeRave.shredzilla.review.StoreCaptureRunner"
@@ -61,6 +61,8 @@ android {
 
     buildTypes {
         debug {
+            // Registers the device as an AdMob test device, so real ad units only serve test ads
+            buildConfigField("Boolean", "AD_TEST_DEVICE", "true")
             if (storeListingCapture) {
                 applicationIdSuffix = ".storecapture"
                 resValue("string", "default_web_client_id", "store-capture.invalid")
@@ -74,6 +76,15 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField("Boolean", "AD_TEST_DEVICE", "false")
+        }
+        // The release build (R8 on) signed with the debug key: installs over a debug build to test
+        // R8 rules on a device without losing data. Never uploaded.
+        create("minifiedDebug") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            buildConfigField("Boolean", "AD_TEST_DEVICE", "true")
         }
     }
     compileOptions {

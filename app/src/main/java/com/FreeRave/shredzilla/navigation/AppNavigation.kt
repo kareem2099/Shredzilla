@@ -170,9 +170,13 @@ fun AppNavigationHost(
                         PhysicalDetailsScreen(
                             isLoading = isLoading,
                             onBack = { navController.popBackStack() },
-                            onDetailsSubmitted = { age, heightCm, weightKg ->
-                                // Height/weight have always been stored as doubles
-                                val details = mapOf("age" to age, "height" to heightCm.toDouble(), "weight" to weightKg.toDouble())
+                            onDetailsSubmitted = { age, heightCm, weightKg, weightUnit, lengthUnit ->
+                                // Height/weight have always been stored as doubles, in cm and kg; the
+                                // units picked here become the account's units
+                                val details = mapOf(
+                                    "age" to age, "height" to heightCm.toDouble(), "weight" to weightKg.toDouble(),
+                                    "unitSystem" to weightUnit.name, "lengthUnit" to lengthUnit.storedValue,
+                                )
                                 saveOnboardingStep(details) { navController.navigate(AppRoutes.REST_TIME_SELECTION) }
                             }
                         )

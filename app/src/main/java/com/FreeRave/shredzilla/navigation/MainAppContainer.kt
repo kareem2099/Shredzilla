@@ -19,6 +19,7 @@ import com.FreeRave.shredzilla.utils.displayToKg
 import com.FreeRave.shredzilla.utils.recordsToBackfill
 import com.FreeRave.shredzilla.models.RecordSet
 import com.FreeRave.shredzilla.models.workingSetCount
+import com.FreeRave.shredzilla.models.completedSetCount
 import com.FreeRave.shredzilla.screens.history.PersonalRecordsScreen
 import com.FreeRave.shredzilla.screens.history.WorkoutHistoryScreen
 import com.FreeRave.shredzilla.screens.history.WorkoutLogScreen
@@ -65,6 +66,13 @@ import com.FreeRave.shredzilla.screens.exercises.AddExerciseScreen
 import com.FreeRave.shredzilla.screens.exercises.ExerciseDetailScreen
 import com.FreeRave.shredzilla.screens.exercises.ExercisesScreen
 import com.FreeRave.shredzilla.screens.pro.ProScreen
+import com.FreeRave.shredzilla.screens.badges.BadgesScreen
+import com.FreeRave.shredzilla.notifications.PendingNavigation
+import com.FreeRave.shredzilla.notifications.ReminderScheduler
+import com.FreeRave.shredzilla.notifications.ReminderStore
+import com.FreeRave.shredzilla.notifications.TrainingSnapshot
+import com.FreeRave.shredzilla.notifications.rememberNotificationPermission
+import com.FreeRave.shredzilla.screens.pro.SupportScreen
 import com.FreeRave.shredzilla.screens.stats.StatsScreen
 import com.FreeRave.shredzilla.pro.BillingEvent
 import com.FreeRave.shredzilla.pro.LocalProAccess
@@ -165,7 +173,7 @@ fun MainAppContainer(
     val exerciseHistory by mainViewModel.exerciseHistory.collectAsState()
     val setsDoneToday = remember(exerciseHistory) {
         val todayKey = dateKeyOf(System.currentTimeMillis())
-        exerciseHistory.mapValues { (_, sets) -> sets.filter { it.dateKey == todayKey }.workingSetCount() }
+        exerciseHistory.mapValues { (_, sets) -> sets.filter { it.dateKey == todayKey }.completedSetCount() }
     }
 
     // A training day is any day with a working set; warm-ups alone don't make a workout
@@ -235,38 +243,70 @@ fun MainAppContainer(
         currentUser?.uid?.let { mainViewModel.loadHistoricalAnalytics(it, force = true) }
     }
 
-    var celebration by remember { mutableStateOf<PrCelebration?>(null) }
+    val workout = mainViewModel.workout
+    val badges = mainViewModel.badges
+    val badgeCount = badges.statuses.filter { it.badge.category != com.FreeRave.shredzilla.badges.BadgeCategory.EVENTS || it.isEarned }
+    val earnedBadgeEmojis = badges.statuses.filter { it.isEarned }
+        .sortedWith(compareByDescending<com.FreeRave.shredzilla.badges.BadgeStatus> { it.badge.tier.ordinal }.thenByDescending { it.earnedAtMillis ?: 0L })
+        .map { it.badge.emoji }
 
-    fun logSet(exName: String, entry: SetEntry, startRest: Boolean = true) {
-        // Checked against the all-time record and the history before this set lands in it
-        val unitSystem = userDataManager.userUnitSystem
-        val exerciseId = exerciseIdOf(exName)
-        val check = checkRecord(exerciseHistory[exerciseId].orEmpty(), trainingHistory.personalRecords[exerciseId], entry, unitSystem)
-        if (check != RecordCheck.NONE) {
-            val load = entry.plates?.toDouble() ?: displayToKg(entry.weight, unitSystem)
-            trainingHistory.saveRecord(exerciseId, exName, entry.plates != null, RecordSet(load, entry.reps, System.currentTimeMillis()))
-        }
-        if (check == RecordCheck.BEATEN) celebration = PrCelebration(exName, formatEntry(entry, unitSystem))
-        // One side at a time: rest once both sides of the pair are done, not between them
-        val todaySets = exerciseHistory[exerciseId].orEmpty().filter { it.dateKey == dateKeyOf(System.currentTimeMillis()) }
-        val pairComplete = entry.side == null ||
-            todaySets.count { it.side == entry.side } + 1 <= todaySets.count { it.side == entry.side.opposite }
-        userDataManager.recordSet(exName, entry, currentUser, onSaved = ::refreshHistory)
-        if (startRest && pairComplete) timerManager.startRestTimer()
+    // --- Notifications: permission, the on-device snapshot the daily check reads, and taps ---
+    val reminderStore = remember { ReminderStore(context) }
+    val notificationPermission = rememberNotificationPermission()
+    var showNotificationExplainer by remember { mutableStateOf(false) }
+
+    LaunchedEffect(userDataManager.notificationChoices) {
+        reminderStore.saveChoices(userDataManager.notificationChoices)
+        ReminderScheduler.syncDaily(context)
+        ReminderScheduler.syncProEnding(context)
     }
+    LaunchedEffect(exerciseHistory, trainingHistory.workoutLogs, userDataManager.userExerciseLists, userDataManager.userWeeklyGoalDays,
+        userDataManager.deloadWeeks, trainingHistory.measurements, userDataManager.measurementCadence) {
+        val lists = userDataManager.userExerciseLists
+        val nextList = nextListAfter(trainingHistory.workoutLogs.firstOrNull()?.listName, lists)
+        reminderStore.saveSnapshot(
+            TrainingSnapshot(
+                trainingDays = exerciseHistory.values.flatten().filter { it.setType != SetType.WARMUP }.map { it.dateKey }.toSet(),
+                weeklyGoal = userDataManager.userWeeklyGoalDays,
+                deloadWeeks = userDataManager.deloadWeeks,
+                lastMeasurementMillis = trainingHistory.measurements.maxOfOrNull { it.takenAtMillis },
+                measurementCadenceDays = userDataManager.measurementCadence.days,
+                nextListId = nextList?.id,
+                nextListName = nextList?.name,
+            )
+        )
+    }
+    LaunchedEffect(userDataManager.adTimeBank.untilMillis, billing.ownsProLifetime) {
+        reminderStore.saveProTime(userDataManager.adTimeBank.untilMillis, billing.ownsProLifetime)
+        ReminderScheduler.syncProEnding(context)
+    }
+    // The workout notification's Finish button: save it here, the workout screen then shows the summary
+    LaunchedEffect(PendingNavigation.finishWorkout) {
+        if (PendingNavigation.finishWorkout) {
+            PendingNavigation.finishWorkout = false
+            workout.finish()
+        }
+    }
+    // A tapped notification's screen, once the app is up
+    LaunchedEffect(PendingNavigation.route) {
+        val route = PendingNavigation.route ?: return@LaunchedEffect
+        PendingNavigation.route = null
+        runCatching { bottomBarNavController.navigate(route) { launchSingleTop = true } }
+            .onFailure { Log.w("Notifications", "Can't open $route", it) }
+    }
+
+    // The first rest is when the lock-screen timer matters, so that's when to ask for notifications
+    fun afterRestStarted(rested: Boolean) {
+        if (rested && !notificationPermission.granted && !reminderStore.permissionPrompted) showNotificationExplainer = true
+    }
+
+    fun logSet(exName: String, entry: SetEntry, startRest: Boolean = true) = afterRestStarted(workout.logSet(exName, entry, startRest))
 
     val recordSetAndStartTimerAction: (String, SetEntry) -> Unit = { exName, entry -> logSet(exName, entry) }
 
     // A new set starts from the last one logged, so machine exercises stay in plates and the load is
     // ready; the suggestion is the progression step from the last session
-    fun prefillFor(exerciseName: String): SetPrefill {
-        val history = exerciseHistory[exerciseIdOf(exerciseName)].orEmpty()
-        val unitSystem = userDataManager.userUnitSystem
-        return SetPrefill(
-            initial = history.firstOrNull()?.nextEntry(unitSystem) ?: SetEntry(),
-            suggestion = suggestNextSet(history, unitSystem)
-        )
-    }
+    fun prefillFor(exerciseName: String): SetPrefill = workout.prefillFor(exerciseName)
 
     val navBackStackEntry by bottomBarNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -339,6 +379,8 @@ fun MainAppContainer(
                         onOpenHistory = { bottomBarNavController.navigate(AppRoutes.WORKOUT_HISTORY) },
                         onOpenRecords = { bottomBarNavController.navigate(AppRoutes.PERSONAL_RECORDS) },
                         onOpenStats = { bottomBarNavController.navigate(AppRoutes.STATS) },
+                        onOpenBadges = { bottomBarNavController.navigate(AppRoutes.BADGES) },
+                        badgeSummary = "${earnedBadgeEmojis.size} of ${badgeCount.size} earned" + earnedBadgeEmojis.take(4).joinToString("") { " $it" },
                         measurementCount = trainingHistory.measurements.size,
                         onOpenBody = { bottomBarNavController.navigate(AppRoutes.BODY_MEASUREMENTS) },
                         recommendedProgramName = recommendedProgramId(userDataManager.userWeeklyGoalDays)
@@ -397,6 +439,7 @@ fun MainAppContainer(
                         userEmail = currentUser?.email,
                         profileImagePath = userDataManager.userProfileImageLocalPath,
                         unitSystem = userDataManager.userUnitSystem,
+                        lengthUnit = userDataManager.userLengthUnit,
                         themeSetting = effectiveThemeSetting,
                         workoutReminderSetting = userDataManager.userWorkoutReminderSetting,
                         restTimePreference = userDataManager.userRestTimePreference,
@@ -408,7 +451,11 @@ fun MainAppContainer(
                         proSource = proAccess.source,
                         proRemainingMillis = userDataManager.adTimeBank.remainingMillis(System.currentTimeMillis()),
                         isSupporter = proAccess.isSupporter,
-                        onNavigateToPro = proAccess.openPro
+                        onNavigateToPro = proAccess.openPro,
+                        onNavigateToSupport = { bottomBarNavController.navigate(AppRoutes.SUPPORT) },
+                        badgeEmojis = earnedBadgeEmojis.take(6),
+                        badgeCountLabel = "${earnedBadgeEmojis.size}/${badgeCount.size}",
+                        onNavigateToBadges = { bottomBarNavController.navigate(AppRoutes.BADGES) }
                     )
                 }
                 composable(AppRoutes.ACCOUNT_SETTINGS) {
@@ -457,16 +504,28 @@ fun MainAppContainer(
                     )
                 }
                 composable(AppRoutes.UNIT_SETTINGS) {
-                    UnitSettingsScreen({ bottomBarNavController.popBackStack() }, userDataManager.userUnitSystem) { newUnitSystem ->
-                        userDataManager.userUnitSystem = newUnitSystem
-                        userDataManager.updateUserSetting(currentUser?.uid, "unitSystem", newUnitSystem.name)
-                    }
+                    UnitSettingsScreen(
+                        onNavigateBack = { bottomBarNavController.popBackStack() },
+                        weightUnit = userDataManager.userUnitSystem,
+                        lengthUnit = userDataManager.userLengthUnit,
+                        onWeightUnitChange = { unit ->
+                            userDataManager.userUnitSystem = unit
+                            userDataManager.updateUserSetting(currentUser?.uid, "unitSystem", unit.name)
+                        },
+                        onLengthUnitChange = { unit ->
+                            userDataManager.userLengthUnit = unit
+                            userDataManager.updateUserSetting(currentUser?.uid, "lengthUnit", unit.storedValue)
+                        }
+                    )
                 }
                 composable(AppRoutes.WORKOUT_REMINDERS) {
-                    WorkoutRemindersScreen({ bottomBarNavController.popBackStack() }, userDataManager.userWorkoutReminderSetting) { newSetting ->
-                        userDataManager.userWorkoutReminderSetting = newSetting
-                        userDataManager.updateUserSetting(currentUser?.uid, "workoutReminder", newSetting)
-                    }
+                    NotificationSettingsScreen(
+                        choices = userDataManager.notificationChoices,
+                        hasWeeklyGoal = userDataManager.userWeeklyGoalDays != null,
+                        measurementRhythm = userDataManager.measurementCadence.label,
+                        onChange = { choices -> userDataManager.updateNotificationChoices(choices, currentUser) },
+                        onNavigateBack = { bottomBarNavController.popBackStack() }
+                    )
                 }
                 composable(AppRoutes.DEFAULT_REST_TIME_SETTINGS) {
                     DefaultRestTimeSettingsScreen(userDataManager.userRestTimePreference, { newPreference ->
@@ -582,11 +641,19 @@ fun MainAppContainer(
                     route = AppRoutes.WORKOUT,
                     arguments = listOf(androidx.navigation.navArgument("listId") { type = androidx.navigation.NavType.StringType })
                 ) { backStackEntry ->
-                    val workoutList = userDataManager.userExerciseLists.find { it.id == backStackEntry.arguments?.getString("listId") }
+                    val listId = backStackEntry.arguments?.getString("listId").orEmpty()
+                    val workoutList = userDataManager.userExerciseLists.find { it.id == listId }
+                    val listName = workoutList?.name ?: "Workout"
+                    val listExercises = exercisesOf(workoutList)
+                    val session = remember(listId) { workout.start(listId, listName, listExercises, targetSetsOf(workoutList)) }
+                    // Keep the running session in step with edits to the list, after composition
+                    SideEffect {
+                        session.listName = listName
+                        session.exercises = listExercises
+                        session.targetSets = targetSetsOf(workoutList)
+                    }
                     WorkoutScreen(
-                        listName = workoutList?.name ?: "Workout",
-                        exercises = exercisesOf(workoutList),
-                        targetSets = targetSetsOf(workoutList),
+                        session = session,
                         history = exerciseHistory,
                         unitSystem = userDataManager.userUnitSystem,
                         isTimerRunning = timerManager.isTimerRunning,
@@ -594,9 +661,12 @@ fun MainAppContainer(
                         timerTotalSeconds = timerManager.timerTotalSeconds,
                         onCloseTimer = { timerManager.stopRestTimer() },
                         prefillFor = ::prefillFor,
-                        onRecordSet = ::logSet,
-                        onSaveWorkout = trainingHistory::saveWorkout,
-                        onFinish = { bottomBarNavController.popBackStack() }
+                        onRecordSet = { entry -> afterRestStarted(workout.logInWorkout(entry)) },
+                        onFinishWorkout = { workout.finish() },
+                        onLeave = {
+                            workout.end()
+                            bottomBarNavController.popBackStack()
+                        }
                     )
                 }
                 composable(AppRoutes.WORKOUT_HISTORY) {
@@ -636,6 +706,7 @@ fun MainAppContainer(
                     BodyMeasurementsScreen(
                         measurements = trainingHistory.measurements,
                         unitSystem = userDataManager.userUnitSystem,
+                        lengthUnit = userDataManager.userLengthUnit,
                         cadence = userDataManager.measurementCadence,
                         onCadenceChange = { userDataManager.updateMeasurementCadence(it, currentUser) },
                         onNew = { openEntry("new") },
@@ -656,6 +727,7 @@ fun MainAppContainer(
                             it.id != measurementId && (existing == null || it.takenAtMillis < existing.takenAtMillis)
                         },
                         unitSystem = userDataManager.userUnitSystem,
+                        lengthUnit = userDataManager.userLengthUnit,
                         cadence = userDataManager.measurementCadence,
                         onSave = { measurement ->
                             trainingHistory.saveMeasurement(measurement)
@@ -692,6 +764,23 @@ fun MainAppContainer(
                             Toast.makeText(context, "Checking Google Play for your purchases…", Toast.LENGTH_SHORT).show()
                         },
                         userId = currentUser?.uid,
+                        onBack = { bottomBarNavController.popBackStack() },
+                        onOpenSupport = { bottomBarNavController.navigate(AppRoutes.SUPPORT) { launchSingleTop = true } }
+                    )
+                }
+                composable(AppRoutes.BADGES) {
+                    BadgesScreen(
+                        statuses = badges.statuses,
+                        unitSystem = userDataManager.userUnitSystem,
+                        onBack = { bottomBarNavController.popBackStack() }
+                    )
+                }
+                composable(AppRoutes.SUPPORT) {
+                    SupportScreen(
+                        supporterTips = userDataManager.supporterTips,
+                        prices = billing.prices,
+                        onBuy = ::buy,
+                        onOpenPro = proAccess.openPro,
                         onBack = { bottomBarNavController.popBackStack() }
                     )
                 }
@@ -724,10 +813,27 @@ fun MainAppContainer(
                 }
             }
         }
+        // A record first, then any badge it unlocked
         PrCelebrationBanner(
-            celebration = celebration,
-            onDismiss = { celebration = null },
+            celebration = workout.celebration ?: badges.celebration,
+            onDismiss = { if (workout.celebration != null) workout.celebration = null else badges.dismissCelebration() },
             modifier = Modifier.align(Alignment.TopCenter)
+        )
+    }
+    if (showNotificationExplainer) {
+        GlassDialog(
+            title = "Turn on notifications?",
+            message = "Then the rest timer shows on your lock screen and buzzes when it's time for your next set. You can also get the reminders you choose in Settings, Notifications.",
+            confirmText = "Turn on",
+            dismissText = "Not now",
+            onConfirm = {
+                showNotificationExplainer = false
+                notificationPermission.request()
+            },
+            onDismiss = {
+                showNotificationExplainer = false
+                reminderStore.permissionPrompted = true
+            }
         )
     }
     billingMessage?.let { (title, message) ->
@@ -751,4 +857,17 @@ internal fun formatLastPerformedTimestamp(timestamp: Timestamp?): String? {
     lastPerformedDate.set(Calendar.HOUR_OF_DAY, 0); lastPerformedDate.set(Calendar.MINUTE, 0); lastPerformedDate.set(Calendar.SECOND, 0); lastPerformedDate.set(Calendar.MILLISECOND, 0)
     val diffInDays = TimeUnit.MILLISECONDS.toDays(today.timeInMillis - lastPerformedDate.timeInMillis).toInt()
     return when (diffInDays) { 0 -> "Today"; 1 -> "Yesterday"; else -> "$diffInDays days ago" }
+}
+
+/**
+ * The list to suggest after a workout on [lastListName]: the next day of the same split
+ * ("Split · Back" after "Split · Chest"), wrapping around; the same list otherwise; the first
+ * list when there's no workout yet. [lists] is in display order, which keeps split days in order.
+ */
+internal fun nextListAfter(lastListName: String?, lists: List<UserExerciseList>): UserExerciseList? {
+    if (lastListName == null) return lists.firstOrNull()
+    val last = lists.find { it.name == lastListName } ?: return lists.firstOrNull()
+    val prefix = last.name.substringBefore(" · ", missingDelimiterValue = "").takeIf { it.isNotEmpty() } ?: return last
+    val days = lists.filter { it.name.startsWith("$prefix · ") }
+    return days.getOrNull((days.indexOf(last) + 1) % days.size)
 }

@@ -1,6 +1,5 @@
 package com.FreeRave.shredzilla.screens.account
 
-import android.Manifest
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -104,13 +103,14 @@ fun AccountScreen(
         pendingCameraUri = null
         if (success && uri != null) usePhoto(uri, "user_profile_camera_")
     }
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) return@rememberLauncherForActivityResult toast("Camera permission denied.")
+    // The system camera app takes the photo and writes it to our file, so no camera permission is
+    // needed (and none is declared: declaring it would make TakePicture require it)
+    fun takePhoto() {
         val photoFile = ImageStorageUtils.createImageFile(context, "user_profile_camera_")
-            ?: return@rememberLauncherForActivityResult toast("Couldn't create a file for the photo.")
+            ?: return toast("Couldn't create a file for the photo.")
         ImageStorageUtils.getUriForFile(context, photoFile).also {
             pendingCameraUri = it
-            cameraLauncher.launch(it)
+            runCatching { cameraLauncher.launch(it) }.onFailure { toast("No camera app found.") }
         }
     }
 
@@ -179,7 +179,7 @@ fun AccountScreen(
                 showChevron = false,
                 onClick = {
                     showPhotoSheet = false
-                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    takePhoto()
                 }
             )
             GlassSettingsRow(

@@ -2,6 +2,7 @@ package com.FreeRave.shredzilla.screens.today
 
 import androidx.compose.material.icons.filled.Timer
 import com.FreeRave.shredzilla.models.Side
+import com.FreeRave.shredzilla.models.movedKgOf
 import com.FreeRave.shredzilla.models.WorkoutLog
 import com.FreeRave.shredzilla.utils.TrainingSession
 import com.FreeRave.shredzilla.utils.formatTrainingTime
@@ -256,8 +257,9 @@ private fun ExerciseLogCard(
     onClick: () -> Unit
 ) {
     val palette = MaterialTheme.glass
-    val volume = remember(sets) {
-        sets.filter { it.setType != SetType.WARMUP }.sumOf { it.weight.toDouble() * it.reps }.roundToLong().toDouble()
+    val working = remember(sets) { sets.filter { it.setType != SetType.WARMUP } }
+    val volume = remember(working) {
+        working.sumOf { movedKgOf(it.weight.toDouble(), it.perSide, it.side) * it.reps }.roundToLong().toDouble()
     }
 
     GlassCard(
@@ -273,12 +275,11 @@ private fun ExerciseLogCard(
                 Text(exerciseName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = palette.content)
                 Text(
                     // Plate-counted sets are stored with 0 kg, so a machine-only card shows reps instead
-                    if (volume > 0) "Volume ${formatStoredWeight(volume, unitSystem)}" else "${sets.sumOf { it.reps }} reps",
+                    if (volume > 0) "Volume ${formatStoredWeight(volume, unitSystem)}" else "${working.sumOf { it.reps }} reps",
                     style = MaterialTheme.typography.bodySmall,
                     color = palette.contentMuted
                 )
             }
-            val working = sets.filter { it.setType != SetType.WARMUP }
             val count = working.count { it.side == null } + maxOf(working.count { it.side == Side.LEFT }, working.count { it.side == Side.RIGHT })
             GlassChip(text = "$count ${if (count == 1) "set" else "sets"}")
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = palette.contentMuted)
@@ -290,7 +291,7 @@ private fun ExerciseLogCard(
 @Composable
 private fun SetRow(set: RecordedSet, unitSystem: UnitSystem) {
     val palette = MaterialTheme.glass
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.Top) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(28.dp).glassSurface(palette, CircleShape)
@@ -298,23 +299,20 @@ private fun SetRow(set: RecordedSet, unitSystem: UnitSystem) {
             Text(if (set.setNumber == 0) "W" else set.setNumber.toString(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = palette.accent)
         }
         Spacer(Modifier.width(12.dp))
-        Text(
-            text = sidePrefix(set.side) + formatSetLoad(set.weight.toDouble(), set.plates, unitSystem, set.bodyweight, set.perSide),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = palette.content
-        )
-        Text("  ×  ${set.reps} reps", style = MaterialTheme.typography.bodyLarge, color = palette.contentMuted)
-        // Type and tempo first, then the user's own notes
-        listOfNotNull(setDetailsLabel(set.setType, set.tempo), set.notes?.takeIf { it.isNotBlank() }).joinToString(" · ").takeIf { it.isNotEmpty() }?.let { notes ->
-            Text(
-                text = notes,
-                style = MaterialTheme.typography.bodySmall,
-                color = palette.contentMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(start = 12.dp)
-            )
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = sidePrefix(set.side) + formatSetLoad(set.weight.toDouble(), set.plates, unitSystem, set.bodyweight, set.perSide),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = palette.content
+                )
+                Text("  ×  ${set.reps} reps", style = MaterialTheme.typography.bodyLarge, color = palette.contentMuted)
+            }
+            // Type and tempo first, then the user's own notes, on their own line so nothing gets cut off
+            listOfNotNull(setDetailsLabel(set.setType, set.tempo), set.notes?.takeIf { it.isNotBlank() }).joinToString(" · ").takeIf { it.isNotEmpty() }?.let { notes ->
+                Text(text = notes, style = MaterialTheme.typography.bodySmall, color = palette.contentMuted)
+            }
         }
     }
 }

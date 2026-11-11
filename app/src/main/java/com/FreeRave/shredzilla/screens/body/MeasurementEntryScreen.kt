@@ -38,6 +38,7 @@ import com.FreeRave.shredzilla.models.BodyMeasurement
 import com.FreeRave.shredzilla.models.MeasurementSite
 import com.FreeRave.shredzilla.models.MeasurementSlot
 import com.FreeRave.shredzilla.screens.settings.UnitSystem
+import com.FreeRave.shredzilla.screens.settings.LengthUnit
 import com.FreeRave.shredzilla.ui.glass.GlassCard
 import com.FreeRave.shredzilla.ui.glass.GlassDialog
 import com.FreeRave.shredzilla.ui.glass.GlassPrimaryButton
@@ -51,7 +52,6 @@ import com.FreeRave.shredzilla.utils.displayToCm
 import com.FreeRave.shredzilla.utils.displayToKg
 import com.FreeRave.shredzilla.utils.formatWeightNumber
 import com.FreeRave.shredzilla.utils.kgToDisplay
-import com.FreeRave.shredzilla.utils.lengthUnit
 import com.FreeRave.shredzilla.utils.parseDecimalInput
 import com.FreeRave.shredzilla.utils.weightUnit
 import java.util.Calendar
@@ -88,18 +88,19 @@ fun MeasurementEntryScreen(
     existing: BodyMeasurement?,
     previous: BodyMeasurement?,
     unitSystem: UnitSystem,
+    lengthUnit: LengthUnit,
     cadence: MeasurementCadence,
     onSave: (BodyMeasurement) -> Unit,
     onDelete: (() -> Unit)?,
     onBack: () -> Unit
 ) {
     val palette = MaterialTheme.glass
-    val unit = unitSystem.lengthUnit()
+    val unit = lengthUnit.symbol
     var takenAt by rememberSaveable { mutableLongStateOf(existing?.takenAtMillis ?: todayAtNoon()) }
     var texts by rememberSaveable {
         mutableStateOf(
             buildMap {
-                existing?.valuesCm?.forEach { (key, cm) -> put(key, formatWeightNumber(cmToDisplay(cm, unitSystem))) }
+                existing?.valuesCm?.forEach { (key, cm) -> put(key, formatWeightNumber(cmToDisplay(cm, lengthUnit))) }
                 existing?.bodyWeightKg?.let { put(BODY_WEIGHT_KEY, formatWeightNumber(kgToDisplay(it, unitSystem))) }
             }
         )
@@ -109,12 +110,12 @@ fun MeasurementEntryScreen(
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
     val values = MeasurementSite.entries.flatMap { it.slots }
-        .mapNotNull { slot -> texts[slot.key]?.let(::parseDecimalInput)?.let { slot.key to displayToCm(it, unitSystem) } }
+        .mapNotNull { slot -> texts[slot.key]?.let(::parseDecimalInput)?.let { slot.key to displayToCm(it, lengthUnit) } }
         .toMap()
     val bodyWeightKg = texts[BODY_WEIGHT_KEY]?.let(::parseDecimalInput)?.let { displayToKg(it, unitSystem) }
     val canSave = values.isNotEmpty() || bodyWeightKg != null
 
-    fun lastLabel(cm: Double?) = cm?.let { " · last ${formatWeightNumber(cmToDisplay(it, unitSystem))}" }.orEmpty()
+    fun lastLabel(cm: Double?) = cm?.let { " · last ${formatWeightNumber(cmToDisplay(it, lengthUnit))}" }.orEmpty()
 
     @Composable
     fun NumberField(key: String, label: String, modifier: Modifier = Modifier) {

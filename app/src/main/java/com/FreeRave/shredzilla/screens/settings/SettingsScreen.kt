@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Timer
@@ -37,6 +38,8 @@ import com.FreeRave.shredzilla.BuildConfig
 import com.FreeRave.shredzilla.screens.account.composables.ProfileAvatar
 import com.FreeRave.shredzilla.ui.glass.GlassCard
 import com.FreeRave.shredzilla.pro.ProGoldSolid
+import com.FreeRave.shredzilla.notifications.AppNotifications
+import androidx.compose.ui.platform.LocalContext
 import com.FreeRave.shredzilla.pro.ProPill
 import com.FreeRave.shredzilla.pro.ProSource
 import com.FreeRave.shredzilla.pro.formatRemaining
@@ -57,6 +60,7 @@ fun SettingsScreen(
     userEmail: String?,
     profileImagePath: String?,
     unitSystem: UnitSystem,
+    lengthUnit: LengthUnit = LengthUnit.CENTIMETRES,
     themeSetting: ThemeSetting,
     workoutReminderSetting: String,
     restTimePreference: String,
@@ -68,7 +72,11 @@ fun SettingsScreen(
     proSource: ProSource,
     proRemainingMillis: Long,
     isSupporter: Boolean,
-    onNavigateToPro: () -> Unit
+    onNavigateToPro: () -> Unit,
+    onNavigateToSupport: () -> Unit = onNavigateToPro,
+    badgeEmojis: List<String> = emptyList(),
+    badgeCountLabel: String = "",
+    onNavigateToBadges: () -> Unit = {}
 ) {
     val palette = MaterialTheme.glass
     Column(modifier = Modifier.fillMaxSize()) {
@@ -81,7 +89,17 @@ fun SettingsScreen(
                 .padding(top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            ProfileCard(userName, userEmail, profileImagePath, isSupporter, onClick = onNavigateToAccount)
+            ProfileCard(userName, userEmail, profileImagePath, isSupporter, badgeEmojis, onClick = onNavigateToAccount)
+
+            GlassSettingsGroup(title = "Progress") {
+                GlassSettingsRow(
+                    icon = Icons.Filled.MilitaryTech,
+                    title = "Badges",
+                    subtitle = "Milestones, strength clubs and events",
+                    value = badgeCountLabel.ifBlank { null },
+                    onClick = onNavigateToBadges
+                )
+            }
 
             GlassSettingsGroup(title = "Pro") {
                 GlassSettingsRow(
@@ -100,15 +118,15 @@ fun SettingsScreen(
                     icon = Icons.Filled.VolunteerActivism,
                     title = "Support the developer",
                     subtitle = "Pre-workout shot, protein scoop or a creatine tub",
-                    onClick = onNavigateToPro
+                    onClick = onNavigateToSupport
                 )
             }
 
             GlassSettingsGroup(title = "Workout") {
                 GlassSettingsRow(
                     icon = Icons.Filled.NotificationsActive,
-                    title = "Workout reminders",
-                    value = reminderLabel(workoutReminderSetting),
+                    title = "Notifications",
+                    value = if (!AppNotifications.enabled(LocalContext.current)) "Off" else reminderLabel(workoutReminderSetting),
                     onClick = onNavigateToWorkoutReminders
                 )
                 GlassSettingsRow(
@@ -123,7 +141,7 @@ fun SettingsScreen(
                 GlassSettingsRow(
                     icon = Icons.Filled.Straighten,
                     title = "Units",
-                    value = if (unitSystem == UnitSystem.METRIC) "Metric" else "Imperial",
+                    value = "${unitSystem.symbol} · ${lengthUnit.symbol}",
                     onClick = onNavigateToUnitSettings
                 )
                 GlassSettingsRow(
@@ -158,7 +176,7 @@ internal fun reminderLabel(setting: String): String =
     setting.substringBefore(" inactive").takeIf { it != setting }?.let { "After $it" } ?: setting
 
 @Composable
-private fun ProfileCard(userName: String?, userEmail: String?, imagePath: String?, isSupporter: Boolean, onClick: () -> Unit) {
+private fun ProfileCard(userName: String?, userEmail: String?, imagePath: String?, isSupporter: Boolean, badgeEmojis: List<String>, onClick: () -> Unit) {
     val palette = MaterialTheme.glass
     GlassCard(
         modifier = Modifier
@@ -183,6 +201,10 @@ private fun ProfileCard(userName: String?, userEmail: String?, imagePath: String
                     Text(userEmail, style = MaterialTheme.typography.bodySmall, color = palette.contentMuted, maxLines = 1)
                 }
                 if (isSupporter) SupporterBadge(modifier = Modifier.padding(top = 6.dp))
+                // Best badges first, as a quick show of what you've earned
+                if (badgeEmojis.isNotEmpty()) {
+                    Text(badgeEmojis.joinToString("  "), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
+                }
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Account", tint = palette.contentMuted)
         }
