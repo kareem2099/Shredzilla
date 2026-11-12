@@ -1,16 +1,13 @@
 {
-  "latestVersion": "1.6.0",
-  "latestVersionCode": 10,
+  "latestVersion": "1.7.1",
+  "latestVersionCode": 12,
   "url": "https://play.google.com/store/apps/details?id=com.FreeRave.shredzilla",
   "releaseNotes": [
-    "No more forced ads: ads only play if you choose to watch one.",
-    "New DotShredzilla Pro: next-set coach, last-time comparison, body insights, training stats, accent themes and share-card styles.",
-    "Get Pro for life with one payment, or 1 hour of Pro per optional ad.",
-    "Today shows your training time and numbers sets 1, 2, 3.",
-    "Works offline: your sets save without internet and sync when you're back online.",
-    "Workout mode with supersets, personal records, workout history and a shareable summary card.",
-    "Plates, bodyweight, per-side and left/right sets, warm-ups, tempo and a plate calculator.",
-    "Weekly goal, streak, deload reminders and body measurements.",
-    "Support development with a tip and get a Supporter badge."
+    "Badges for everyone: milestones, weight clubs, streaks and events.",
+    "The first 100 members get a numbered Founding member badge.",
+    "Log sets from the lock screen with the live workout notification.",
+    "Reminders: next workout, weekly goal, measurements. Pick your time.",
+    "Separate units for weights (kg/lb) and measurements (cm/in).",
+    "Fixes: you stay signed in, set numbers with left/right, records count more reps, no camera permission."
   ]
 }
