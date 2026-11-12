@@ -1,13 +1,14 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Backup rules for Android 11 and older (Android 12+ uses data_extraction_rules.xml).
+   Firebase Auth encrypts the saved sign-in with a key kept in the Android Keystore, which is never
+   backed up. Restoring its files onto a new install leaves a key that can't be used, and the app
+   then can't keep anyone signed in, so they are excluded. Signing in again after a restore is
+   expected; training data lives in the account.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="sharedpref" path="com.google.firebase.auth.api.crypto.W0RFRkFVTFRd+MTo1MDE0ODU1MzU4MzY6YW5kcm9pZDoxZjVhNDk4MjIwNGI0YjY1Mjc5Yzk5.xml" />
+    <exclude domain="sharedpref" path="com.google.firebase.auth.api.Store.W0RFRkFVTFRd+MTo1MDE0ODU1MzU4MzY6YW5kcm9pZDoxZjVhNDk4MjIwNGI0YjY1Mjc5Yzk5.xml" />
+    <exclude domain="sharedpref" path="session.xml" />
+    <exclude domain="sharedpref" path="workout_session.xml" />
 </full-backup-content>

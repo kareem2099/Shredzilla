@@ -84,7 +84,7 @@ class BadgeTracker(
     private fun inputsKey(): List<Any?> = listOf(
         userDataManager.badgesLoaded, userDataManager.earnedBadges, userDataManager.badgeStats, userDataManager.userUnitSystem,
         userDataManager.userWeeklyGoalDays, userDataManager.deloadWeeks, userDataManager.userExerciseLists, userDataManager.supporterTips,
-        trainingHistory.workoutLogs, trainingHistory.personalRecords, trainingHistory.measurements, billing.ownsProLifetime,
+        userDataManager.foundingNumber, trainingHistory.workoutLogs, trainingHistory.personalRecords, trainingHistory.measurements, billing.ownsProLifetime,
     )
 
     private fun judge(h: Map<String, List<LoggedSet>>) {
@@ -121,8 +121,7 @@ class BadgeTracker(
             lists = userDataManager.userExerciseLists,
             ownsLifetime = billing.ownsProLifetime,
             supporterTips = userDataManager.supporterTips,
-            accountCreatedMillis = user.metadata?.creationTimestamp,
-            foundingCutoffMillis = BadgeEventsConfig.foundingCutoffMillis(),
+            foundingNumber = userDataManager.foundingNumber,
             stats = userDataManager.badgeStats,
             events = events,
             earned = userDataManager.earnedBadges,
@@ -168,8 +167,8 @@ class BadgeTracker(
 }
 
 /**
- * Remote Config for badges: "badge_events" is a JSON list of events, "founding_cutoff" the last
- * sign-up date ("yyyy-MM-dd") that earns Founding member. Both work without an app update.
+ * Remote Config for badges: "badge_events" is a JSON list of events, added without an app update.
+ * (Founding member isn't here: the server numbers the first 100 accounts.)
  *
  * Event example:
  * [{"id":"ramadan_2027","title":"Ramadan Warrior","emoji":"🌙","description":"Train on 10 days during Ramadan",
@@ -177,16 +176,8 @@ class BadgeTracker(
  */
 object BadgeEventsConfig {
     const val EVENTS_KEY = "badge_events"
-    const val FOUNDING_KEY = "founding_cutoff"
-    private const val DEFAULT_FOUNDING_CUTOFF = "2027-03-31"
 
     fun events(): List<BadgeEvent> = parseEvents(FirebaseRemoteConfig.getInstance().getString(EVENTS_KEY))
-
-    fun foundingCutoffMillis(): Long {
-        val text = FirebaseRemoteConfig.getInstance().getString(FOUNDING_KEY).ifBlank { DEFAULT_FOUNDING_CUTOFF }
-        val date = runCatching { LocalDate.parse(text) }.getOrDefault(LocalDate.parse(DEFAULT_FOUNDING_CUTOFF))
-        return date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
-    }
 
     /** Bad entries are skipped rather than breaking the badges page. */
     fun parseEvents(json: String): List<BadgeEvent> {

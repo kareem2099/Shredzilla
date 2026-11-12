@@ -27,12 +27,12 @@ class BadgesTest {
         stats: BadgeStats = BadgeStats(),
         unit: UnitSystem = UnitSystem.METRIC,
         events: List<BadgeEvent> = emptyList(),
-        created: Long? = null,
+        founding: Int? = null,
         earned: Map<String, Long> = emptyMap(),
     ) = BadgeInput(
         now = now, unitSystem = unit, history = history, workoutLogs = emptyList(), records = records,
         measurements = emptyList(), streakWeeks = 0, weeklyGoalMet = false, deloadWeeks = emptySet(), lists = emptyList(),
-        ownsLifetime = false, supporterTips = 0, accountCreatedMillis = created, foundingCutoffMillis = now,
+        ownsLifetime = false, supporterTips = 0, foundingNumber = founding,
         stats = stats, events = events, earned = earned,
     )
 
@@ -40,8 +40,15 @@ class BadgesTest {
     private fun status(id: String, i: BadgeInput) = evaluateBadges(i).first { it.badge.id == id }
 
     @Test fun `nothing logged earns nothing but founding`() {
-        val all = evaluateBadges(input(created = now - day))
+        val all = evaluateBadges(input(founding = 7))
         assertEquals(listOf("founding"), all.filter { it.isEarned }.map { it.badge.id })
+        assertEquals("Founding member #7", status("founding", input(founding = 7)).badge.title)
+    }
+
+    @Test fun `founding needs the server number, a saved badge alone doesn't count`() {
+        val saved = input(earned = mapOf("founding" to now - day))
+        assertFalse(status("founding", saved).isEarned)
+        assertEquals("Founding member", status("founding", saved).badge.title)
     }
 
     @Test fun `first set and one side`() {

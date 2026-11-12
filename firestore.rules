@@ -25,5 +25,11 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
     }
+
+    // Founding member number (#1 to #100), given by the assignFoundingNumber Cloud Function in
+    // sign-up order. Each member can read their own; nobody can write it from the app.
+    match /founders/{uid} {
+      allow read: if isOwner(uid);
+    }
   }
 }

@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.auth.userProfileChangeRequest
 
 /** Sign-up couldn't finish, so the half-created account was removed again. AuthErrorMapper keys off this text. */
@@ -23,13 +24,15 @@ class FirebaseEmailPasswordAuth {
                 try {
                     // The app reads the name from the auth profile (greeting, settings), so set it there too
                     firebaseUser.updateProfile(userProfileChangeRequest { displayName = name }).await()
-                    // Save user details to Firestore
+                    // The profile is written to the device first and syncs on its own; waiting for the
+                    // server here used to hang on a weak connection and then undo the new account
                     val user = hashMapOf(
                         "uid" to firebaseUser.uid,
                         "name" to name,
                         "email" to email
                     )
-                    db.collection("users").document(firebaseUser.uid).set(user).await()
+                    db.collection("users").document(firebaseUser.uid).set(user, SetOptions.merge())
+                        .addOnFailureListener { e -> Log.e("Auth", "Profile write failed", e) }
                     Result.success(firebaseUser)
                 } catch (e: Exception) {
                     // If Firestore fails, rollback the Firebase Auth creation

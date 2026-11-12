@@ -1,19 +1,20 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Backup and device-transfer rules for Android 12+. Firebase Auth's saved sign-in is encrypted with
+   a Keystore key that never leaves the device, so its files are excluded: restored without the key
+   they'd stop the app from keeping anyone signed in. See backup_rules.xml for older versions.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="com.google.firebase.auth.api.crypto.W0RFRkFVTFRd+MTo1MDE0ODU1MzU4MzY6YW5kcm9pZDoxZjVhNDk4MjIwNGI0YjY1Mjc5Yzk5.xml" />
+        <exclude domain="sharedpref" path="com.google.firebase.auth.api.Store.W0RFRkFVTFRd+MTo1MDE0ODU1MzU4MzY6YW5kcm9pZDoxZjVhNDk4MjIwNGI0YjY1Mjc5Yzk5.xml" />
+        <exclude domain="sharedpref" path="session.xml" />
+        <exclude domain="sharedpref" path="workout_session.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="com.google.firebase.auth.api.crypto.W0RFRkFVTFRd+MTo1MDE0ODU1MzU4MzY6YW5kcm9pZDoxZjVhNDk4MjIwNGI0YjY1Mjc5Yzk5.xml" />
+        <exclude domain="sharedpref" path="com.google.firebase.auth.api.Store.W0RFRkFVTFRd+MTo1MDE0ODU1MzU4MzY6YW5kcm9pZDoxZjVhNDk4MjIwNGI0YjY1Mjc5Yzk5.xml" />
+        <exclude domain="sharedpref" path="session.xml" />
+        <exclude domain="sharedpref" path="workout_session.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

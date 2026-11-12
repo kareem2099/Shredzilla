@@ -92,6 +92,9 @@ class UserDataManager(
     /** How many tips (consumable purchases) this account has sent; any tip shows the supporter badge. */
     var supporterTips by mutableIntStateOf(0)
         private set
+    /** Founding member number (1 to 100), given by the server in sign-up order; null for everyone else. */
+    var foundingNumber by mutableStateOf<Int?>(null)
+        private set
     /** Which reminders are on and when they arrive; the inactivity part lives in [userWorkoutReminderSetting]. */
     var notificationChoices by mutableStateOf(NotificationChoices())
         private set
@@ -149,6 +152,7 @@ class UserDataManager(
         measurementCadence = MeasurementCadence.WEEKLY
         adTimeBank = AdTimeBank()
         supporterTips = 0
+        foundingNumber = null
         notificationChoices = NotificationChoices()
         earnedBadges = emptyMap()
         eventBadgeDetails = emptyMap()
@@ -317,6 +321,15 @@ class UserDataManager(
                     }
                 }
             listeners.add(userDocRegistration)
+
+            // Founding member number, written only by the server (founders/{uid}); most accounts have none
+            listeners.add(db.collection("founders").document(userId).addSnapshotListener { doc, e ->
+                if (e != null) {
+                    Log.w("Firestore", "Founding number listen failed for $userId.", e)
+                    return@addSnapshotListener
+                }
+                foundingNumber = doc?.getLong("number")?.toInt()?.takeIf { it in 1..100 }
+            })
 
             // Listener for user's exercise lists
             val exerciseListsRegistration = db.collection("users").document(userId).collection("exerciseLists")

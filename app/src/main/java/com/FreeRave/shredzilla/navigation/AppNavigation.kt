@@ -50,16 +50,20 @@ fun AppNavigationHost(
         if (isLoading) return // double-tap guard
         isLoading = true
         mainViewModel.viewModelScope.launch {
-            val destination = attempt().mapCatching { user -> mainViewModel.resolveStartDestination(user.uid).getOrThrow() }
-            destination
-                .onSuccess { dest ->
+            attempt()
+                .onSuccess { user ->
+                    // Signed in: go in even if the profile can't be read yet. A brand-new account
+                    // starts onboarding; a returning one opens the app and syncs when it can.
+                    val isNew = user.metadata?.let { kotlin.math.abs(it.lastSignInTimestamp - it.creationTimestamp) < 10_000 } ?: false
+                    val dest = mainViewModel.resolveStartDestination(user.uid).getOrElse {
+                        if (isNew) AppRoutes.ONBOARDING else AppRoutes.FITNESS_MAIN
+                    }
                     navController.navigate(dest) {
                         popUpTo(AppRoutes.AUTH) { inclusive = true }
                         launchSingleTop = true
                     }
                 }
                 .onFailure { e ->
-                    if (firebaseEmailAuthManager.getCurrentUser() != null) firebaseGoogleAuthManager.signOut()
                     if (!silentFailure(e)) Toast.makeText(context, AuthErrorMapper.getMessage(e), Toast.LENGTH_LONG).show()
                 }
             isLoading = false

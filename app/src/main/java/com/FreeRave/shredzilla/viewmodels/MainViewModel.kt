@@ -60,14 +60,25 @@ class MainViewModel(
         savedStateHandle["startDestination"] = dest
     }
 
+    val sessionStore = com.FreeRave.shredzilla.auth.SessionStore(application)
+
     /**
      * Where a signed-in user should land: the first unfinished onboarding step, or the main app.
-     * Also applies their gender theme. Fails if the user document can't be read.
+     * Also applies their gender theme.
+     *
+     * Never needs the network for a returning user: once an account finished onboarding on this
+     * device the answer is kept locally. Otherwise the profile comes from Firestore's cache first,
+     * then the server. Fails only when neither answers; callers must not sign out because of that.
      */
-    suspend fun resolveStartDestination(userId: String): Result<String> =
-        UserFirestoreHelper.getUserData(userId).map { userData ->
-            ThemeManager.currentGenderTheme = userData?.get("gender") as? String
-            when {
+    suspend fun resolveStartDestination(userId: String): Result<String> {
+        if (sessionStore.isOnboarded(userId)) {
+            ThemeManager.currentGenderTheme = sessionStore.gender(userId)
+            return Result.success(AppRoutes.FITNESS_MAIN)
+        }
+        return UserFirestoreHelper.getUserData(userId).map { userData ->
+            val gender = userData?.get("gender") as? String
+            ThemeManager.currentGenderTheme = gender
+            val destination = when {
                 userData == null -> AppRoutes.ONBOARDING
                 userData.containsKey("weeklyGoalFrequency") -> AppRoutes.FITNESS_MAIN
                 userData.containsKey("initialExercises") -> AppRoutes.WEEKLY_GOAL_SELECTION
@@ -76,7 +87,13 @@ class MainViewModel(
                 userData.containsKey("gender") -> AppRoutes.PHYSICAL_DETAILS
                 else -> AppRoutes.ONBOARDING
             }
+            sessionStore.remember(userId, onboarded = destination == AppRoutes.FITNESS_MAIN, gender = gender)
+            destination
         }
+    }
+
+    /** Keeps the local copy of the profile in step after onboarding finishes or the gender changes. */
+    fun rememberOnboarded(userId: String, gender: String?) = sessionStore.remember(userId, onboarded = true, gender = gender)
 
     /** Forget the signed-out user's cached data so the next account never sees it. */
     fun clearSession() {
@@ -88,6 +105,7 @@ class MainViewModel(
         ThemeManager.currentGenderTheme = null
         ThemeManager.accentTheme = null
         workout.clear()
+        sessionStore.clear()
         // The next account must not get this one's reminders
         com.FreeRave.shredzilla.notifications.ReminderStore(getApplication()).clear()
         com.FreeRave.shredzilla.notifications.ReminderScheduler.cancelAll(getApplication())

@@ -11,6 +11,7 @@ import java.security.MessageDigest
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        resetUnusableAuthKey()
         // Debug builds use the real ad unit, so the server-side reward callback can be tested end to
         // end, but always mark this device as a test device: AdMob then serves labelled test ads and
         // a developer's own views never count as real impressions.
@@ -20,6 +21,24 @@ class MyApplication : Application() {
             )
         }
         MobileAds.initialize(this) {}
+    }
+
+    /**
+     * Firebase Auth encrypts the saved sign-in with a key in the Android Keystore. A backup restore
+     * or device transfer can bring back its keyset file without that key, and then no sign-in can be
+     * saved: the app forgets the user every time it closes. When no sign-in is saved there is
+     * nothing the old keyset protects, so it's removed before Firebase Auth starts and Firebase
+     * creates a working one with the next sign-in.
+     */
+    private fun resetUnusableAuthKey() {
+        val suffix = "W0RFRkFVTFRd+MTo1MDE0ODU1MzU4MzY6YW5kcm9pZDoxZjVhNDk4MjIwNGI0YjY1Mjc5Yzk5"
+        val store = getSharedPreferences("com.google.firebase.auth.api.Store.$suffix", MODE_PRIVATE)
+        if (store.contains("com.google.firebase.auth.FIREBASE_USER")) return
+        val crypto = "com.google.firebase.auth.api.crypto.$suffix"
+        if (getSharedPreferences(crypto, MODE_PRIVATE).all.isNotEmpty()) {
+            deleteSharedPreferences(crypto)
+            android.util.Log.i("MyApplication", "No saved sign-in; reset Firebase Auth's keyset")
+        }
     }
 
     /** AdMob's test-device id: the MD5 of this app's ANDROID_ID, upper-case hex. */

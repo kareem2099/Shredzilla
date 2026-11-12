@@ -16,6 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.1] — 2026-11-12
+
+Released instead of 1.7.0, which was approved but never published; it includes everything in 1.7.0.
+
+### Fixed
+- **Signed out on every launch.** Android backup restored Firebase Auth's encrypted session without the Keystore key that opens it, so the session could never be read again. Those files are now excluded from cloud backup and device transfer, and an unreadable key is reset at startup so the next sign-in sticks.
+- The app no longer signs you out when your profile can't be loaded (weak connection, slow start): it opens and syncs later. Only an account that was deleted or disabled is signed out.
+- Google and email sign-in no longer wait for the server to save the profile, which hung on weak connections and then signed the user out. Whether onboarding is done is remembered on the device for faster starts.
+
+### Changed
+- **Founding member is exactly the first 100 accounts**, numbered #1 to #100 by sign-up order. A Cloud Function (`assignFoundingNumber`) gives the number when an account is created and numbers existing accounts once. It is stored in `founders/{uid}`, which members can read but not write, apart from the profile so no app version's profile write can touch it; a deleted account's number is removed and never reused. The badge shows "Founding member #N". Replaces the `founding_cutoff` date.
+- Version name **1.7.1**, version code **12**.
+
+---
+
 ## [1.7.0] — 2026-11-11
 
 ### Added

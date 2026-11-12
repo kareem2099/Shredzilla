@@ -1,8 +1,6 @@
 package com.FreeRave.shredzilla
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.content.Intent
 import android.util.Log
@@ -31,6 +29,8 @@ import androidx.compose.foundation.layout.Box
 import com.FreeRave.shredzilla.update.AppUpdateController
 import com.FreeRave.shredzilla.update.AppUpdateOverlay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 
 class MainActivity : ComponentActivity() {
 
@@ -143,30 +143,37 @@ class MainActivity : ComponentActivity() {
     }
 
     // This function determines destination only — doesn't navigate directly
+    /**
+     * A saved sign-in always opens the app: Firebase Auth keeps it on the device, and the start
+     * screen comes from a local copy or Firestore's cache. A profile that can't be read (offline,
+     * gym Wi-Fi without internet, a slow server) never signs anyone out; the app opens and syncs
+     * later. Only an account Firebase reports as deleted or disabled is signed out.
+     */
     private fun checkOnboardingAndSetDestination(userId: String) {
         lifecycleScope.launch {
             mainViewModel.resolveStartDestination(userId)
                 .onSuccess { dest -> mainViewModel.updateStartDestination(dest) }
                 .onFailure { e ->
-                    Log.e(TAG, "Error fetching user data: ${e.message}")
-                    if (!isNetworkAvailable(this@MainActivity)) {
-                        // Offline with a saved session: let them train; Firestore syncs later
-                        Toast.makeText(this@MainActivity, "Network error. Working offline.", Toast.LENGTH_SHORT).show()
-                        mainViewModel.updateStartDestination(AppRoutes.FITNESS_MAIN)
-                    } else {
-                        // Don't keep a session we can't load; send them to a clean login
-                        firebaseEmailAuthManager.signOut()
-                        Toast.makeText(this@MainActivity, "Authentication error. Please log in again.", Toast.LENGTH_SHORT).show()
-                        mainViewModel.updateStartDestination(AppRoutes.AUTH)
-                    }
+                    Log.w(TAG, "Profile not readable yet, opening the app: ${e.message}")
+                    mainViewModel.updateStartDestination(AppRoutes.FITNESS_MAIN)
                 }
+            verifyAccountStillExists()
         }
     }
 
-    private fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    /** Refreshes the sign-in in the background; network errors are ignored, a removed account signs out. */
+    private suspend fun verifyAccountStillExists() {
+        val user = firebaseEmailAuthManager.getCurrentUser() ?: return
+        try {
+            user.reload().await()
+        } catch (e: FirebaseAuthInvalidUserException) {
+            Log.w(TAG, "Account was deleted or disabled; signing out", e)
+            firebaseEmailAuthManager.signOut()
+            mainViewModel.clearSession()
+            Toast.makeText(this, "This account is no longer available. Please sign in again.", Toast.LENGTH_LONG).show()
+            mainViewModel.updateStartDestination(AppRoutes.AUTH)
+        } catch (e: Exception) {
+            Log.d(TAG, "Couldn't refresh the sign-in right now (offline?): ${e.message}")
+        }
     }
 }

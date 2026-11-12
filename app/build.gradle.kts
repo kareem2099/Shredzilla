@@ -18,8 +18,8 @@ android {
         applicationId = "com.FreeRave.shredzilla"
         minSdk = 29
         targetSdk = 37
-        versionCode = 11
-        versionName = "1.7.0"
+        versionCode = 12
+        versionName = "1.7.1"
 
         testInstrumentationRunner = if (storeListingCapture) {
             "com.FreeRave.shredzilla.review.StoreCaptureRunner"

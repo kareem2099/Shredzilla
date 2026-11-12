@@ -78,8 +78,8 @@ data class BadgeInput(
     val lists: List<UserExerciseList>,
     val ownsLifetime: Boolean,
     val supporterTips: Int,
-    val accountCreatedMillis: Long?,
-    val foundingCutoffMillis: Long,
+    /** Given by the server to the first 100 accounts only; the app can't set it. */
+    val foundingNumber: Int?,
     val stats: BadgeStats,
     val events: List<BadgeEvent>,
     /** Badges already on the account; badges earned by an action (not by data) only live here. */
@@ -96,6 +96,7 @@ object BadgeIds {
     const val POCKET_LOGGER = "pocket_logger"
 }
 
+const val FOUNDING = "founding"
 private const val KG_PER_LB = 0.45359237
 private val DAY = TimeUnit.DAYS.toMillis(1)
 
@@ -150,7 +151,7 @@ fun badgeCatalog(unit: UnitSystem, events: List<BadgeEvent>): List<Badge> {
         add(Badge("measure_10", "Tracker", "Log 10 measurement sessions", "📐", BadgeCategory.BODY, BadgeTier.SILVER, 10))
         add(Badge("measure_90", "Three months on record", "Keep measuring for 90 days", "🗓️", BadgeCategory.BODY, BadgeTier.GOLD, 90))
 
-        add(Badge("founding", "Founding member", "Joined DotShredzilla in its first months", "⭐", BadgeCategory.COMMUNITY, BadgeTier.SPECIAL))
+        add(Badge(FOUNDING, "Founding member", "One of the first 100 people to join DotShredzilla", "⭐", BadgeCategory.COMMUNITY, BadgeTier.SPECIAL))
         add(Badge("pro_life", "Pro for life", "Own DotShredzilla Pro for life", "👑", BadgeCategory.COMMUNITY, BadgeTier.GOLD))
         add(Badge("supporter_1", "Supporter", "Send a tip", "❤️", BadgeCategory.COMMUNITY, BadgeTier.BRONZE))
         add(Badge("supporter_3", "Big supporter", "Send 3 tips", "💜", BadgeCategory.COMMUNITY, BadgeTier.SILVER, 3))
@@ -198,13 +199,14 @@ fun evaluateBadges(input: BadgeInput): List<BadgeStatus> {
         put("first_measure", has(input.measurements.isNotEmpty()))
         put("measure_10", input.measurements.size)
         put("measure_90", measureSpanDays)
-        put("founding", has(input.accountCreatedMillis != null && input.accountCreatedMillis <= input.foundingCutoffMillis))
+        put(FOUNDING, has(input.foundingNumber != null))
         put("pro_life", has(input.ownsLifetime))
         put("supporter_1", input.supporterTips); put("supporter_3", input.supporterTips); put("supporter_10", input.supporterTips)
         input.events.forEach { e -> put("event_${e.id}", eventProgress(e, working, input.now)) }
     }
 
     return badgeCatalog(input.unitSystem, input.events).map { badge ->
+        if (badge.id == FOUNDING) return@map foundingStatus(badge, input)
         BadgeStatus(badge, current = progress[badge.id] ?: 0, earnedAtMillis = input.earned[badge.id])
     }
 }
@@ -232,3 +234,16 @@ internal fun fullSplitInAWeek(logs: List<WorkoutLog>, lists: List<UserExerciseLi
 }
 
 private fun hourOf(millis: Long): Int = Calendar.getInstance().apply { timeInMillis = millis }.get(Calendar.HOUR_OF_DAY)
+
+/**
+ * Founding member exists only with the number the server gave: a badge saved on the device or the
+ * profile without one doesn't count. The member's number goes in the title.
+ */
+private fun foundingStatus(badge: Badge, input: BadgeInput): BadgeStatus {
+    val number = input.foundingNumber ?: return BadgeStatus(badge, current = 0, earnedAtMillis = null)
+    return BadgeStatus(
+        badge.copy(title = "Founding member #$number", description = "One of the first 100 people to join DotShredzilla. You're #$number."),
+        current = 1,
+        earnedAtMillis = input.earned[FOUNDING] ?: input.now,
+    )
+}

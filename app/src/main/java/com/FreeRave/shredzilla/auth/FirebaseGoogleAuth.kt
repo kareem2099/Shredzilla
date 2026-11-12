@@ -90,25 +90,19 @@ class FirebaseGoogleAuth(private val activity: Activity) {
                 }
             }
 
-            // Save / merge user data in Firestore
-            try {
-                val userMap = hashMapOf<String, Any?>().apply {
-                    put("uid", firebaseUser.uid)
-                    put("email", firebaseUser.email)
-                    if (!firebaseUser.displayName.isNullOrEmpty()) {
-                        put("name", firebaseUser.displayName)
-                    }
+            // Save / merge the profile: written to the device first and synced on its own. Waiting
+            // for the server here hung on weak connections and then signed the user out again.
+            val userMap = hashMapOf<String, Any?>().apply {
+                put("uid", firebaseUser.uid)
+                put("email", firebaseUser.email)
+                if (!firebaseUser.displayName.isNullOrEmpty()) {
+                    put("name", firebaseUser.displayName)
                 }
-                db.collection("users").document(firebaseUser.uid)
-                    .set(userMap, SetOptions.merge())
-                    .await()
-                Result.success(firebaseUser)
             }
- catch (e: Exception) {
-                // Firestore failed — rollback auth state to avoid zombie session
-                signOut()
-                Result.failure(Exception("Database sync failed. Please try again.", e))
-            }
+            db.collection("users").document(firebaseUser.uid)
+                .set(userMap, SetOptions.merge())
+                .addOnFailureListener { e -> Log.e("GoogleAuth", "Profile write failed", e) }
+            Result.success(firebaseUser)
 
         } catch (e: GetCredentialCancellationException) {
             // User dismissed the bottom sheet — not an error
